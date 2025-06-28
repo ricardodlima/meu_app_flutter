@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/producao_service.dart';
 
 class TelaDeProducao extends StatefulWidget {
   const TelaDeProducao({Key? key}) : super(key: key);
@@ -21,6 +22,11 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   Timer? _reconnectTimer;
   late TextEditingController _ipController;
   late TextEditingController _portController;
+
+  // Firebase
+  final ProducaoService _producaoService = ProducaoService();
+  int? _ultimoValorFirebase;
+  String? _loteAtualId;
 
   @override
   void initState() {
@@ -151,6 +157,26 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
+  // Função cérebro: sincroniza com o Firestore
+  Future<void> _sincronizarComFirebase(int novoValor) async {
+    // Início de lote
+    if ((_ultimoValorFirebase == null || _ultimoValorFirebase == 0) && novoValor > 0) {
+      _loteAtualId = await _producaoService.criarNovoLote();
+      await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
+    }
+    // Fim de lote
+    else if (_ultimoValorFirebase != null && _ultimoValorFirebase! > 0 && novoValor == 0 && _loteAtualId != null) {
+      await _producaoService.finalizarLote(_loteAtualId!, _ultimoValorFirebase!);
+      await _producaoService.atualizarEstadoGlobal(novoValor, null);
+      _loteAtualId = null;
+    }
+    // Atualização normal
+    else if (_loteAtualId != null) {
+      await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
+    }
+    _ultimoValorFirebase = novoValor;
+  }
+
   void _processarResposta(String resposta) {
     resposta.split('\n').where((linha) => linha.trim().isNotEmpty).forEach((linha) {
       if (linha.startsWith('C1:')) {
@@ -163,6 +189,10 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                 _contador1 = int.tryParse(partes[1]) ?? 0;
               });
               _salvarContador1(_contador1);
+              // Integração Firestore: só sincroniza se mudou
+              if (_contador1 != _ultimoValorFirebase) {
+                _sincronizarComFirebase(_contador1);
+              }
             }
           }
         }
