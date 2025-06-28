@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "709422866032",
+    "project_id": "testev1-85d9b",
+    "storage_bucket": "testev1-85d9b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:709422866032:android:0ad716cb1a7246d6bcdeb5",
+        "android_client_info": {
+          "package_name": "com.fef.gestaototalcomia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfDr41iUK-crJ90naJHEyeMZWl_7M4DV8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
