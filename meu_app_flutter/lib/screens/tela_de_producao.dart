@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/producao_service.dart';
+import '../services/network_control_service.dart';
 
 class TelaDeProducao extends StatefulWidget {
   const TelaDeProducao({Key? key}) : super(key: key);
@@ -27,6 +28,11 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   final ProducaoService _producaoService = ProducaoService();
   int? _ultimoValorFirebase;
   String? _loteAtualId;
+  
+  // Controle de rede
+  bool _networkControlSupported = false;
+  bool _ethernetAvailable = false;
+  bool _wifiAvailable = false;
 
   @override
   void initState() {
@@ -34,6 +40,7 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     _ipController = TextEditingController(text: '192.168.1.100');
     _portController = TextEditingController(text: '8080');
     _carregarContadorSalvo();
+    _verificarControleDeRede();
     _startAutoConnect();
   }
 
@@ -48,6 +55,82 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   Future<void> _salvarContador1(int valor) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('contador1', valor);
+  }
+
+  /// Verifica se o controle programático de rede é suportado
+  Future<void> _verificarControleDeRede() async {
+    try {
+      final supported = await NetworkControlService.isNetworkControlSupported();
+      final networkInfo = await NetworkControlService.getNetworkInfo();
+      
+      setState(() {
+        _networkControlSupported = supported;
+        _ethernetAvailable = networkInfo['hasEthernet'] ?? false;
+        _wifiAvailable = networkInfo['hasWifi'] ?? false;
+      });
+      
+      print('Controle de rede suportado: $_networkControlSupported');
+      print('Ethernet disponível: $_ethernetAvailable');
+      print('Wi-Fi disponível: $_wifiAvailable');
+    } catch (e) {
+      print('Erro ao verificar controle de rede: $e');
+    }
+  }
+
+  /// Força o uso da rede Ethernet para comunicação com ESP32
+  Future<void> _forcarRedeEthernet() async {
+    if (!_networkControlSupported || !_ethernetAvailable) {
+      print('Controle de rede não disponível');
+      return;
+    }
+    
+    try {
+      final success = await NetworkControlService.forceEthernetNetwork();
+      if (success) {
+        print('Rede Ethernet forçada com sucesso');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🌐 Rede Ethernet ativada para ESP32'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('Falha ao forçar rede Ethernet');
+      }
+    } catch (e) {
+      print('Erro ao forçar rede Ethernet: $e');
+    }
+  }
+
+  /// Força o uso da rede Wi-Fi para internet/Firebase
+  Future<void> _forcarRedeWifi() async {
+    if (!_networkControlSupported || !_wifiAvailable) {
+      print('Controle de rede não disponível');
+      return;
+    }
+    
+    try {
+      final success = await NetworkControlService.forceWifiNetwork();
+      if (success) {
+        print('Rede Wi-Fi forçada com sucesso');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📶 Rede Wi-Fi ativada para internet'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('Falha ao forçar rede Wi-Fi');
+      }
+    } catch (e) {
+      print('Erro ao forçar rede Wi-Fi: $e');
+    }
   }
 
   void _startAutoConnect() {
@@ -93,6 +176,13 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     });
     
     try {
+      // Força rede Ethernet para ESP32
+      if (_networkControlSupported && _ethernetAvailable) {
+        await _forcarRedeEthernet();
+        // Aguarda um pouco para a mudança de rede
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
       final ip = _ipController.text;
       final port = int.tryParse(_portController.text) ?? 8080;
 
@@ -159,22 +249,33 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
 
   // Função cérebro: sincroniza com o Firestore
   Future<void> _sincronizarComFirebase(int novoValor) async {
-    // Início de lote
-    if ((_ultimoValorFirebase == null || _ultimoValorFirebase == 0) && novoValor > 0) {
-      _loteAtualId = await _producaoService.criarNovoLote();
-      await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
+    // Força rede Wi-Fi para Firebase
+    if (_networkControlSupported && _wifiAvailable) {
+      await _forcarRedeWifi();
+      // Aguarda um pouco para a mudança de rede
+      await Future.delayed(const Duration(milliseconds: 500));
     }
-    // Fim de lote
-    else if (_ultimoValorFirebase != null && _ultimoValorFirebase! > 0 && novoValor == 0 && _loteAtualId != null) {
-      await _producaoService.finalizarLote(_loteAtualId!, _ultimoValorFirebase!);
-      await _producaoService.atualizarEstadoGlobal(novoValor, null);
-      _loteAtualId = null;
+    
+    try {
+      // Início de lote
+      if ((_ultimoValorFirebase == null || _ultimoValorFirebase == 0) && novoValor > 0) {
+        _loteAtualId = await _producaoService.criarNovoLote();
+        await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
+      }
+      // Fim de lote
+      else if (_ultimoValorFirebase != null && _ultimoValorFirebase! > 0 && novoValor == 0 && _loteAtualId != null) {
+        await _producaoService.finalizarLote(_loteAtualId!, _ultimoValorFirebase!);
+        await _producaoService.atualizarEstadoGlobal(novoValor, null);
+        _loteAtualId = null;
+      }
+      // Atualização normal
+      else if (_loteAtualId != null) {
+        await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
+      }
+      _ultimoValorFirebase = novoValor;
+    } catch (e) {
+      print('Erro na sincronização Firebase: $e');
     }
-    // Atualização normal
-    else if (_loteAtualId != null) {
-      await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
-    }
-    _ultimoValorFirebase = novoValor;
   }
 
   void _processarResposta(String resposta) {
@@ -246,6 +347,73 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Atualizar'),
               ),
+              const SizedBox(height: 24),
+              
+              // Controles de rede
+              if (_networkControlSupported) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        const Text(
+                          '🌐 Controle de Rede',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                                                         ElevatedButton.icon(
+                               onPressed: _ethernetAvailable ? _forcarRedeEthernet : null,
+                               icon: const Icon(Icons.cable),
+                               label: const Text('Ethernet'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _wifiAvailable ? _forcarRedeWifi : null,
+                              icon: const Icon(Icons.wifi),
+                              label: const Text('Wi-Fi'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Ethernet: ${_ethernetAvailable ? "✅" : "❌"} | Wi-Fi: ${_wifiAvailable ? "✅" : "❌"}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        const Text(
+                          '⚠️ Controle de Rede',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Controle programático de rede não suportado neste dispositivo',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
