@@ -17,6 +17,7 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   String _statusConexao = 'Desconectado';
   int _contador1 = 0;
   bool _emProcessoDeConexao = false;
+  bool _resetEmAndamento = false;
 
   Socket? _socket;
   Timer? _pollingTimer;
@@ -27,7 +28,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   // Firebase
   final ProducaoService _producaoService = ProducaoService();
   int? _ultimoValorFirebase;
-  String? _loteAtualId;
   
   // Controle de rede
   bool _networkControlSupported = false;
@@ -247,7 +247,7 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  // Função cérebro: sincroniza com o Firestore
+  // Função cérebro: sincroniza com o Firestore (somente estado global)
   Future<void> _sincronizarComFirebase(int novoValor) async {
     // Força rede Wi-Fi para Firebase
     if (_networkControlSupported && _wifiAvailable) {
@@ -257,21 +257,8 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
     
     try {
-      // Início de lote
-      if ((_ultimoValorFirebase == null || _ultimoValorFirebase == 0) && novoValor > 0) {
-        _loteAtualId = await _producaoService.criarNovoLote();
-        await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
-      }
-      // Fim de lote
-      else if (_ultimoValorFirebase != null && _ultimoValorFirebase! > 0 && novoValor == 0 && _loteAtualId != null) {
-        await _producaoService.finalizarLote(_loteAtualId!, _ultimoValorFirebase!);
-        await _producaoService.atualizarEstadoGlobal(novoValor, null);
-        _loteAtualId = null;
-      }
-      // Atualização normal
-      else if (_loteAtualId != null) {
-        await _producaoService.atualizarEstadoGlobal(novoValor, _loteAtualId);
-      }
+      // Atualização simples do estado global
+      await _producaoService.atualizarEstadoGlobal(novoValor);
       _ultimoValorFirebase = novoValor;
     } catch (e) {
       print('Erro na sincronização Firebase: $e');
@@ -279,6 +266,10 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   }
 
   void _processarResposta(String resposta) {
+    if (_resetEmAndamento) {
+      // Durante o reset, ignoramos leituras para evitar sobrescrever o 0 no Firebase
+      return;
+    }
     resposta.split('\n').where((linha) => linha.trim().isNotEmpty).forEach((linha) {
       if (linha.startsWith('C1:')) {
         final dados = linha.split(',');
@@ -319,104 +310,175 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('Contador 1', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              Text(_contador1.toString(), style: const TextStyle(fontSize: 48)),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: isConnected ? () => _enviarComando('r1') : null,
-                child: const Text('Resetar Contador 1'),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                isConnected ? 'Conectado ao ESP32' : 'Desconectado do ESP32',
-                style: TextStyle(
-                  color: isConnected ? Colors.green : Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _tryConnect,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Atualizar'),
-              ),
-              const SizedBox(height: 24),
-              
-              // Controles de rede
-              if (_networkControlSupported) ...[
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        const Text(
-                          '🌐 Controle de Rede',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      body: Stack(
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Contador 1', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  Text(_contador1.toString(), style: const TextStyle(fontSize: 48)),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _contador1++;
+                          });
+                          _salvarContador1(_contador1);
+                          _sincronizarComFirebase(_contador1);
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('+1'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _contador1 = 0;
+                            _resetEmAndamento = true;
+                          });
+                          // Se estiver conectado ao ESP32, envia o comando de reset primeiro
+                          if (isConnected) {
+                            _enviarComando('r1');
+                          }
+                          // Garante escrita local imediata e sincronização levemente postergada
+                          _salvarContador1(0);
+                          Future.delayed(const Duration(milliseconds: 600), () async {
+                            await _sincronizarComFirebase(0);
+                            if (mounted) {
+                              setState(() {
+                                _resetEmAndamento = false;
+                              });
+                            }
+                          });
+                        },
+                        child: const Text('Resetar Contador 1'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    isConnected ? 'Conectado ao ESP32' : 'Desconectado do ESP32',
+                    style: TextStyle(
+                      color: isConnected ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _tryConnect,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Atualizar'),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Controles de rede
+                  if (_networkControlSupported) ...[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
                           children: [
-                                                         ElevatedButton.icon(
-                               onPressed: _ethernetAvailable ? _forcarRedeEthernet : null,
-                               icon: const Icon(Icons.cable),
-                               label: const Text('Ethernet'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                              ),
+                            const Text(
+                              '🌐 Controle de Rede',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
-                            ElevatedButton.icon(
-                              onPressed: _wifiAvailable ? _forcarRedeWifi : null,
-                              icon: const Icon(Icons.wifi),
-                              label: const Text('Wi-Fi'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: _ethernetAvailable ? _forcarRedeEthernet : null,
+                                  icon: const Icon(Icons.cable),
+                                  label: const Text('Ethernet'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: _wifiAvailable ? _forcarRedeWifi : null,
+                                  icon: const Icon(Icons.wifi),
+                                  label: const Text('Wi-Fi'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Ethernet: ${_ethernetAvailable ? "✅" : "❌"} | Wi-Fi: ${_wifiAvailable ? "✅" : "❌"}',
+                              style: const TextStyle(fontSize: 12),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Ethernet: ${_ethernetAvailable ? "✅" : "❌"} | Wi-Fi: ${_wifiAvailable ? "✅" : "❌"}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ] else ...[
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        const Text(
-                          '⚠️ Controle de Rede',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ] else ...[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            const Text(
+                              '⚠️ Controle de Rede',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Controle programático de rede não suportado neste dispositivo',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Controle programático de rede não suportado neste dispositivo',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ],
+                  ],
+                  const SizedBox(height: 80), // Espaço para o botão INICIO
+                ],
+              ),
+            ),
           ),
-        ),
+          // Botão INICIO no canto inferior esquerdo
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/tela1');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00BCD4), // Azul vibrante
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'INICIO',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

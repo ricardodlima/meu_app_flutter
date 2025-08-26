@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
-import 'screens/tela_de_producao.dart';
-import 'screens/configuracoes_screen.dart';
-import 'screens/config_ethernet_screen.dart';
+import 'screens/01_tela_1_producao.dart';
+import 'screens/05_tela_2_producao.dart';
+import 'screens/106_tela_de_producao.dart';
+import 'screens/103_configuracoes_screen.dart';
+import 'screens/102_config_ethernet_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,8 +51,10 @@ class MyApp extends StatelessWidget {
           fillColor: Colors.white,
         ),
       ),
-      initialRoute: '/producao',
+      initialRoute: '/tela1',
       routes: {
+        '/tela1': (context) => const Tela1Producao(),
+        '/tela2': (context) => const Tela2Producao(),
         '/producao': (context) => const TelaDeProducao(),
         '/configuracoes': (context) => const ConfiguracoesScreen(),
         '/conf-ethernet': (context) => const ConfigEthernetScreen(),

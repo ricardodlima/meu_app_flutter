@@ -3,20 +3,18 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-class ContadorScreen extends StatefulWidget {
-  const ContadorScreen({Key? key}) : super(key: key);
+class ConfigEthernetScreen extends StatefulWidget {
+  const ConfigEthernetScreen({Key? key}) : super(key: key);
 
   @override
-  State<ContadorScreen> createState() => _ContadorScreenState();
+  State<ConfigEthernetScreen> createState() => _ConfigEthernetScreenState();
 }
 
-class _ContadorScreenState extends State<ContadorScreen> {
-  // --- Estado da UI ---
+class _ConfigEthernetScreenState extends State<ConfigEthernetScreen> {
   String _statusConexao = 'Desconectado';
   final Map<String, int> _contadores = {'C1': 0, 'C2': 0, 'C3': 0, 'C4': 0};
   bool _emProcessoDeConexao = false;
 
-  // --- Lógica de Conexão ---
   Socket? _socket;
   Timer? _pollingTimer;
   Timer? _reconnectTimer;
@@ -26,7 +24,6 @@ class _ContadorScreenState extends State<ContadorScreen> {
   @override
   void initState() {
     super.initState();
-    // Inicializa os controladores com os valores padrão
     _ipController = TextEditingController(text: '192.168.1.100');
     _portController = TextEditingController(text: '8080');
     _startAutoConnect();
@@ -71,7 +68,7 @@ class _ContadorScreenState extends State<ContadorScreen> {
 
     setState(() {
       _emProcessoDeConexao = true;
-      _atualizarStatus('Conectando a ${_ipController.text}:${_portController.text}...');
+      _atualizarStatus('Conectando a 2${_ipController.text}:${_portController.text}...');
     });
     
     try {
@@ -84,15 +81,12 @@ class _ContadorScreenState extends State<ContadorScreen> {
       _socket!.listen(
         (List<int> dados) {
           final resposta = utf8.decode(dados).trim();
-          print("Recebido do ESP32: $resposta");
           _processarResposta(resposta);
         },
         onError: (error) {
-          print("Erro de socket: $error");
           _handleDesconexao(erro: error.toString());
         },
         onDone: () {
-          print("Conexão encerrada pelo servidor.");
           _handleDesconexao();
         },
         cancelOnError: true,
@@ -101,7 +95,6 @@ class _ContadorScreenState extends State<ContadorScreen> {
       _iniciarPolling();
       
     } catch (e) {
-      print("Falha na conexão: $e");
       _handleDesconexao(erro: e.toString());
     } finally {
       if(mounted) setState(() => _emProcessoDeConexao = false);
@@ -120,11 +113,9 @@ class _ContadorScreenState extends State<ContadorScreen> {
         if (erroMsg.contains("errno = 111")) erroMsg = "Conexão recusada. Verifique o IP/Porta e se o ESP32 está ligado.";
         if (erroMsg.contains("timed out")) erroMsg = "Tempo esgotado. Verifique o IP e a rede.";
         _statusConexao = erro != null ? 'Erro: $erroMsg' : 'Desconectado';
-        
         _contadores.updateAll((key, value) => 0);
       });
     }
-    // Após desconexão, a reconexão automática já está ativa pelo timer
   }
 
   void _iniciarPolling() {
@@ -140,7 +131,6 @@ class _ContadorScreenState extends State<ContadorScreen> {
 
   void _enviarComando(String comando) {
     if (_socket != null) {
-      print("Enviando comando: $comando");
       _socket!.writeln(comando);
     } else {
       _atualizarStatus("Erro: Não conectado.");
@@ -175,30 +165,60 @@ class _ContadorScreenState extends State<ContadorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('IHM Contadores KC868-A16'),
+        title: const Text('Configuração Ethernet'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildConnectionCard(isConnected),
-            const SizedBox(height: 12),
-            _buildStatusChip(isConnected),
-            const SizedBox(height: 20),
-            _buildCountersGrid(isConnected),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.delete_sweep),
-                label: const Text('RESETAR TODOS'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], padding: const EdgeInsets.symmetric(vertical: 16)),
-                onPressed: isConnected ? () => _enviarComando('rall') : null,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                _buildConnectionCard(isConnected),
+                const SizedBox(height: 12),
+                _buildStatusChip(isConnected),
+                const SizedBox(height: 20),
+                _buildCountersGrid(isConnected),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.delete_sweep),
+                    label: const Text('RESETAR TODOS'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], padding: const EdgeInsets.symmetric(vertical: 16)),
+                    onPressed: isConnected ? () => _enviarComando('rall') : null,
+                  ),
+                ),
+                const SizedBox(height: 80), // Espaço para o botão INICIO
+              ],
+            ),
+          ),
+          // Botão INICIO no canto inferior esquerdo
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/tela1');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00BCD4), // Azul vibrante
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'INICIO',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
