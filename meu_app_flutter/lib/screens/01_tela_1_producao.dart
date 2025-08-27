@@ -220,107 +220,128 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     bool isConnected = _socket != null;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF212121), // Fundo escuro
-      body: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Stack(
-            children: [
-              // Título no canto superior esquerdo
-              Positioned(
-                top: 16,
-                left: 16,
+      backgroundColor: const Color(0xFF262526), // Fundo cinza escuro como no B.txt
+      body: Container(
+        width: 1024,
+        height: 600,
+        clipBehavior: Clip.antiAlias,
+        decoration: const BoxDecoration(color: Color(0xFF262526)),
+        child: Stack(
+          children: [
+            // Título "Valor Atual da Produção" - canto superior esquerdo
+            Positioned(
+              left: 16,
+              top: 20,
+              child: SizedBox(
+                width: 360,
                 child: Text(
                   'Valor Atual da Produção',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+
+            // Título "Nº operador" - canto superior direito
+            Positioned(
+              left: 677,
+              top: 18,
+              child: SizedBox(
+                width: 360,
+                child: Text(
+                  'Nº operador',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+
+            // Display "0000" (azul) - esquerda, abaixo do título
+            Positioned(
+              left: 45,
+              top: 75,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2DA8D1), // Azul como no B.txt
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(
+                  _contador1.toString().padLeft(4, '0'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 64,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+
+            // Display "00000" (verde) - direita, abaixo do título
+            Positioned(
+              left: 740,
+              top: 75,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF00), // Verde brilhante como no B.txt
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: const Text(
+                  '00000',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 64,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+
+            // Botão "CONF." - canto inferior direito
+            Positioned(
+              left: 850,
+              top: 450,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Navegar para a tela 2 (05_tela_2_producao)
+                  Navigator.pushReplacementNamed(context, '/tela2');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2DA8D1),
+                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                    side: const BorderSide(
+                      width: 2,
+                      color: Color(0xFF2DA9D2),
+                    ),
+                  ),
+                  elevation: 4,
+                  shadowColor: const Color(0x33000000),
+                ),
+                child: const Text(
+                  'CONF.',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 20,
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-
-              // Status de conexão no canto superior direito
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: isConnected ? Colors.green : Colors.red,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    isConnected ? 'ESP32 OK' : 'ESP32 OFF',
-                    style: TextStyle(
-                      color: isConnected ? Colors.green : Colors.red,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Display do contador no canto superior esquerdo
-              Positioned(
-                top: 16,
-                left: 16,
-                child: Container(
-                  width: 246,
-                  height: 82,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF80DEEA), // Azul claro
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _contador1.toString().padLeft(4, '0'),
-                      style: const TextStyle(
-                        fontSize: 64,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Botão CONF no canto inferior direito
-              Positioned(
-                bottom: 16,
-                right: 16,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navega para a Tela 2
-                    Navigator.pushReplacementNamed(context, '/tela2');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00BCD4), // Azul vibrante
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'CONF.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
