@@ -178,57 +178,27 @@ class _ContadorScreenState extends State<ContadorScreen> {
         title: const Text('IHM Contadores KC868-A16'),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                _buildConnectionCard(isConnected),
-                const SizedBox(height: 12),
-                _buildStatusChip(isConnected),
-                const SizedBox(height: 20),
-                _buildCountersGrid(isConnected),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.delete_sweep),
-                    label: const Text('RESETAR TODOS'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], padding: const EdgeInsets.symmetric(vertical: 16)),
-                    onPressed: isConnected ? () => _enviarComando('rall') : null,
-                  ),
-                ),
-                const SizedBox(height: 80), // Espaço para o botão INICIO
-              ],
-            ),
-          ),
-          // Botão INICIO no canto inferior esquerdo
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/tela1');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00BCD4), // Azul vibrante
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'INICIO',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildConnectionCard(isConnected),
+            const SizedBox(height: 12),
+            _buildStatusChip(isConnected),
+            const SizedBox(height: 20),
+            _buildCountersGrid(isConnected),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.delete_sweep),
+                label: const Text('RESETAR TODOS'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], padding: const EdgeInsets.symmetric(vertical: 16)),
+                onPressed: isConnected ? () => _enviarComando('rall') : null,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
