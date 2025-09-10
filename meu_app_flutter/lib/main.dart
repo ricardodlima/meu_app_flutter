@@ -3,9 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/01_tela_1_producao.dart';
 import 'screens/05_tela_2_producao.dart';
+import 'screens/10_tela_03_hora_turno.dart';
 import 'screens/106_tela_de_producao.dart';
 import 'screens/103_configuracoes_screen.dart';
 import 'screens/102_config_ethernet_screen.dart';
+import 'screens/15_04_ajuste_Producao.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,9 +57,11 @@ class MyApp extends StatelessWidget {
       routes: {
         '/tela1': (context) => const Tela1Producao(),
         '/tela2': (context) => const Tela2Producao(),
+        '/tela3': (context) => const Tela03HoraTurno(),
         '/producao': (context) => const TelaDeProducao(),
         '/configuracoes': (context) => const ConfiguracoesScreen(),
         '/conf-ethernet': (context) => const ConfigEthernetScreen(),
+        '/ajuste_producao': (context) => const AjusteProducao(),
       },
     );
   }

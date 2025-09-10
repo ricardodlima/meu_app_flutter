@@ -36,6 +36,33 @@ class Tela2Producao extends StatelessWidget {
                 ),
                 child: Stack(
                   children: [
+                    // Botão "Ajuste de Produção" no centro
+                    Positioned(
+                      top: 50,
+                      left: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacementNamed(context, '/ajuste_producao');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00BCD4), // Azul vibrante
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Ajuste de\nProdução',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
                     // Botão INICIO no canto inferior esquerdo
                     Positioned(
                       bottom: 16,
@@ -62,6 +89,7 @@ class Tela2Producao extends StatelessWidget {
                         ),
                       ),
                     ),
+                    
                     
                     // Botão Telas 102-106 no canto inferior direito
                     Positioned(
