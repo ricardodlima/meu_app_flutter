@@ -38,6 +38,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   late TextEditingController _numeroProgramaController;
   String _statusMaquinaSelecionado = '1';
   String _motivoSelecionado = '1';
+  String _motivoParadaSelecionado = '1';
 
   List<Map<String, String>> get _opcoesStatusMaquina {
     List<Map<String, String>> opcoes = [
@@ -63,6 +64,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     for (int i = 3; i <= 10; i++) {
       opcoes.add({'value': i.toString(), 'label': '$i -'});
     }
+    return opcoes;
+  }
+
+  List<Map<String, String>> get _opcoesMotivoParada {
+    List<Map<String, String>> opcoes = [
+      {'value': '1', 'label': '1 - Dimensão'},
+      {'value': '2', 'label': '2 - Quebra'},
+      {'value': '3', 'label': '3 - Setup'},
+      {'value': '4', 'label': '4 - Limpeza'},
+      {'value': '5', 'label': '5 - Outro'},
+    ];
     return opcoes;
   }
 
@@ -399,6 +411,14 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                   if (val != null) {
                     setState(() {
                       _motivoSelecionado = val;
+                    });
+                  }
+                }),
+                const SizedBox(height: 10),
+                _buildDropdown('Motivo de Parada', _motivoParadaSelecionado, _opcoesMotivoParada, (val) {
+                  if (val != null) {
+                    setState(() {
+                      _motivoParadaSelecionado = val;
                     });
                   }
                 }),
