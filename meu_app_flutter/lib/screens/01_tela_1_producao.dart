@@ -1,9 +1,21 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
-import 'dart:io';
-import 'dart:convert';
-import '../services/network_control_service.dart';
+
+// Supondo que este seja o caminho correto para o seu serviço
+// import '../services/network_control_service.dart';
+
+// --- INÍCIO: Bloco de código para simular o serviço ausente ---
+// Remova ou comente este bloco se você tiver o arquivo network_control_service.dart
+class NetworkControlService {
+  static Future<bool> isNetworkControlSupported() async => false;
+  static Future<Map<String, bool>> getNetworkInfo() async => {'hasEthernet': false, 'hasWifi': false};
+  static Future<void> forceEthernetNetwork() async {}
+}
+// --- FIM: Bloco de código para simular o serviço ausente ---
 
 class Tela1Producao extends StatefulWidget {
   const Tela1Producao({Key? key}) : super(key: key);
@@ -16,7 +28,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   int _contador1 = 0;
   String _statusConexao = 'Desconectado';
   bool _emProcessoDeConexao = false;
-  
   Socket? _socket;
   Timer? _pollingTimer;
   Timer? _reconnectTimer;
@@ -24,10 +35,10 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   late TextEditingController _portController;
   late TextEditingController _operadorController;
   late TextEditingController _modeloPecaController;
+  late TextEditingController _numeroProgramaController;
   String _statusMaquinaSelecionado = '1';
   String _motivoSelecionado = '1';
 
-  // Lista de opções para o status da máquina
   List<Map<String, String>> get _opcoesStatusMaquina {
     List<Map<String, String>> opcoes = [
       {'value': '1', 'label': '1 - Maquina em produção'},
@@ -38,31 +49,23 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
       {'value': '6', 'label': '6 - Parada Banheiro'},
       {'value': '7', 'label': '7 - Para Refeição'},
     ];
-    
-    // Adiciona opções de 8 a 50 numeradas
     for (int i = 8; i <= 50; i++) {
       opcoes.add({'value': i.toString(), 'label': '$i - Opção $i'});
     }
-    
     return opcoes;
   }
 
-  // Lista de opções para o motivo
   List<Map<String, String>> get _opcoesMotivo {
     List<Map<String, String>> opcoes = [
       {'value': '1', 'label': '1 - Dimensão'},
       {'value': '2', 'label': '2 - Quebra'},
     ];
-    
-    // Adiciona opções de 3 a 10 vazias
     for (int i = 3; i <= 10; i++) {
       opcoes.add({'value': i.toString(), 'label': '$i -'});
     }
-    
     return opcoes;
   }
 
-  // Controle de rede
   bool _networkControlSupported = false;
   bool _ethernetAvailable = false;
   bool _wifiAvailable = false;
@@ -70,23 +73,15 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   @override
   void initState() {
     super.initState();
-    _ipController = TextEditingController(text: '192.168.1.100');
+    _ipController = TextEditingController(text: '192.18.1.100');
     _portController = TextEditingController(text: '8080');
     _operadorController = TextEditingController(text: '00000');
-    _modeloPecaController = TextEditingController(text: 'ABC-123');
-    
-    // Adiciona listener para o controlador do operador
+    _modeloPecaController = TextEditingController();
+    _numeroProgramaController = TextEditingController();
     _operadorController.addListener(() {
-      setState(() {
-        // Força a atualização quando o controlador muda
-      });
+      setState(() {});
     });
-    
-    _carregarContadorSalvo();
-    _carregarOperadorSalvo();
-    _carregarModeloPecaSalvo();
-    _verificarControleDeRede();
-    _startAutoConnect();
+    _carregarDadosIniciais();
   }
 
   @override
@@ -98,7 +93,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     _portController.dispose();
     _operadorController.dispose();
     _modeloPecaController.dispose();
+    _numeroProgramaController.dispose();
     super.dispose();
+  }
+
+  Future<void> _carregarDadosIniciais() async {
+    await _carregarContadorSalvo();
+    await _carregarOperadorSalvo();
+    await _carregarModeloPecaSalvo();
+    await _carregarNumeroProgramaSalvo();
+    _verificarControleDeRede();
+    _startAutoConnect();
   }
 
   Future<void> _carregarContadorSalvo() async {
@@ -118,9 +123,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     final prefs = await SharedPreferences.getInstance();
     final operadorSalvo = prefs.getString('operador') ?? '00000';
     _operadorController.text = operadorSalvo;
-    setState(() {
-      // Força a atualização da interface
-    });
+    setState(() {});
   }
 
   Future<void> _salvarOperador(String operador) async {
@@ -130,11 +133,16 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
 
   Future<void> _carregarModeloPecaSalvo() async {
     final prefs = await SharedPreferences.getInstance();
-    final modeloSalvo = prefs.getString('modelo_peca') ?? 'ABC-123';
+    final modeloSalvo = prefs.getString('modelo_peca') ?? 'N/A';
     _modeloPecaController.text = modeloSalvo;
-    setState(() {
-      // Força a atualização da interface
-    });
+    setState(() {});
+  }
+
+  Future<void> _carregarNumeroProgramaSalvo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final numProgSalvo = prefs.getString('numero_programa') ?? 'N/A';
+    _numeroProgramaController.text = numProgSalvo;
+    setState(() {});
   }
 
   Future<void> _salvarModeloPeca(String modelo) async {
@@ -154,12 +162,10 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     }
   }
 
-  /// Verifica se o controle programático de rede é suportado
   Future<void> _verificarControleDeRede() async {
     try {
       final supported = await NetworkControlService.isNetworkControlSupported();
       final networkInfo = await NetworkControlService.getNetworkInfo();
-      
       setState(() {
         _networkControlSupported = supported;
         _ethernetAvailable = networkInfo['hasEthernet'] ?? false;
@@ -170,12 +176,10 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     }
   }
 
-  /// Força o uso da rede Ethernet para comunicação com ESP32
   Future<void> _forcarRedeEthernet() async {
     if (!_networkControlSupported || !_ethernetAvailable) {
       return;
     }
-    
     try {
       await NetworkControlService.forceEthernetNetwork();
       await Future.delayed(const Duration(milliseconds: 500));
@@ -210,24 +214,18 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
 
   Future<void> _iniciarConexao() async {
     if (_emProcessoDeConexao || _socket != null) return;
-
     setState(() {
       _emProcessoDeConexao = true;
       _atualizarStatus('Conectando...');
     });
-    
     try {
-      // Força rede Ethernet para ESP32
       if (_networkControlSupported && _ethernetAvailable) {
         await _forcarRedeEthernet();
       }
-      
       final ip = _ipController.text;
       final port = int.tryParse(_portController.text) ?? 8080;
-
       _socket = await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
       _atualizarStatus('Conectado');
-      
       _socket!.listen(
         (List<int> dados) {
           final resposta = utf8.decode(dados).trim();
@@ -240,8 +238,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           _handleDesconexao();
         },
       );
-
-      // Inicia polling para manter conexão ativa
       _pollingTimer?.cancel();
       _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
         if (_socket != null) {
@@ -250,7 +246,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           timer.cancel();
         }
       });
-
     } catch (e) {
       _handleDesconexao(erro: e.toString());
     } finally {
@@ -266,7 +261,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     _socket?.destroy();
     _socket = null;
     _pollingTimer?.cancel();
-    
     if (mounted) {
       setState(() {
         _emProcessoDeConexao = false;
@@ -287,7 +281,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
 
   void _processarResposta(String resposta) {
     if (!mounted) return;
-    
     resposta.split('\n').where((linha) => linha.trim().isNotEmpty).forEach((linha) {
       if (linha.startsWith('C1:')) {
         final dados = linha.split(',');
@@ -311,227 +304,83 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF262526), // Fundo cinza escuro como na imagem
-      body: Container(
-        width: 1024,
-        height: 600,
-        clipBehavior: Clip.antiAlias,
-        decoration: const BoxDecoration(color: Color(0xFF262526)),
-        child: Stack(
+      backgroundColor: const Color(0xFF262526),
+      body: Padding(
+        padding: const EdgeInsets.all(40.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildLeftColumn(),
+            const SizedBox(width: 20),
+            _buildRightColumn(),
+          ],
+        ),
+      ),
+    );
+  }
 
-
-            // Display "Valor Atual da Produção" (azul) - Lado esquerdo
-            Positioned(
-              left: 45,
-              top: 50,
-              child: Column(
-                children: [
-                  Text(
-                    'Valor Atual da Produção',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 298,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+  Widget _buildLeftColumn() {
+    return SizedBox(
+      width: 298,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF303F9F),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildInfoColumn(
+                  'Valor Atual da Produção',
+                  child: Container(
+                    height: 50,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2DA8D1),
+                      color: const Color(0xFFADFF2F), // <-- COR ALTERADA
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(
                       _contador1.toString().padLeft(5, '0'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 64,
-                        fontFamily: 'Roboto',
-                      ),
+                          color: Colors.black, fontSize: 40, fontFamily: 'Roboto'),
                     ),
                   ),
-                ],
-              ),
-            ),
-
-
-            // Display lado a lado - Nº operador e MODELO PEÇA
-            Positioned(
-              right: 50,
-              top: 50,
-              child: Row(
-                children: [
-                  // Nº operador (lado esquerdo)
-                  Column(
-                    children: [
-                      Text(
-                        'Nº operador',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 200, // Mesmo tamanho
-                        height: 50, // Altura fixa
-                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: const Color(0xFF00FF00), width: 3),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: _OperadorInputField(
-                          controller: _operadorController,
-                          onChanged: _salvarOperador,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 20),
-                  // MODELO PEÇA (lado direito) - mesmo tamanho
-                  Column(
-                    children: [
-                      Text(
-                        'MODELO PEÇA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 400, // Dobrou a largura (era 200, agora 400)
-                        height: 50, // Altura fixa igual ao operador
-                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: const Color(0xFF2DA8D1), width: 3),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: _ModeloPecaInputField(
-                          controller: _modeloPecaController,
-                          onChanged: _salvarModeloPeca,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Botão "CONF." - navega para tela2
-            Positioned(
-              left: 850,
-              top: 450,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/tela2');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2DA8D1),
-                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(5),
-                    side: const BorderSide(
-                      width: 2,
-                      color: Color(0xFF2DA9D2),
-                    ),
-                  ),
-                  elevation: 4,
-                  shadowColor: const Color(0x33000000),
                 ),
-                child: const Text(
-                  'CONF.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontFamily: 'Roboto',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-
-            // Botão "Zerar Contagem"
-            Positioned(
-              left: 45,
-              top: 180,
-              child: SizedBox(
-                width: 298,
-                child: ElevatedButton(
+                const SizedBox(height: 10),
+                ElevatedButton(
                   onPressed: () {
-                    setState(() {
-                      _contador1 = 0;
-                    });
+                    setState(() { _contador1 = 0; });
                     _salvarContador1(0);
-                    if (_socket != null) {
-                      _enviarComando('r1');
-                    }
+                    if (_socket != null) { _enviarComando('r1'); }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                   ),
-                  child: const Text(
-                    'Zerar Contagem',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
+                  child: const Text('Zerar Contagem',
+                      style: TextStyle(fontSize: 24, fontFamily: 'Roboto')),
                 ),
-              ),
+              ],
             ),
-
-            // Botão "HORA E TURNO"
-            Positioned(
-              left: 45,
-              top: 250,
-              child: SizedBox(
-                width: 298,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacementNamed(context, '/tela3');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF9800), // Laranja
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    elevation: 4,
-                    shadowColor: const Color(0x33000000),
-                  ),
-                  child: const Text(
-                    'HORA E TURNO',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF303F9F),
+              borderRadius: BorderRadius.circular(5),
             ),
-
-            // Botão "Subtrair Contagem 1"
-            Positioned(
-              left: 360,
-              top: 250,
-              child: SizedBox(
-                width: 200,
-                child: ElevatedButton(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ElevatedButton(
                   onPressed: _subtrairContagem,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -542,156 +391,206 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                       side: const BorderSide(color: Colors.red, width: 2),
                     ),
                   ),
-                  child: const Text(
-                    'Subtrair Contagem 1',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.bold,
+                  child: const Text('Subtrair Contagem 1',
+                      style: TextStyle(fontSize: 16, fontFamily: 'Roboto', fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 10),
+                _buildDropdown('Motivo', _motivoSelecionado, _opcoesMotivo, (val) {
+                  if (val != null) {
+                    setState(() {
+                      _motivoSelecionado = val;
+                    });
+                  }
+                }),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRightColumn() {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF303F9F),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildInfoColumn(
+                    'NUMERO DO PROGRAMA',
+                    child: Container(
+                      height: 50,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFF2DA8D1), width: 3),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: TextField(
+                        controller: _numeroProgramaController,
+                        readOnly: true,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold),
+                        decoration:
+                            const InputDecoration(border: InputBorder.none, isDense: true),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-
-            // Campo "Status da maquina" - DropdownButton
-            Positioned(
-              left: 45,
-              top: 320,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Status da maquina',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 300,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.white, width: 1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _statusMaquinaSelecionado,
-                        isExpanded: true,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        items: _opcoesStatusMaquina.map((Map<String, String> opcao) {
-                          return DropdownMenuItem<String>(
-                            value: opcao['value'],
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                opcao['label']!,
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? novoValor) {
-                          if (novoValor != null) {
-                            setState(() {
-                              _statusMaquinaSelecionado = novoValor;
-                            });
-                          }
-                        },
+                const SizedBox(width: 20),
+                Expanded(
+                  child: _buildInfoColumn(
+                    'MODELO PEÇA',
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFF2DA8D1), width: 3),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: _ModeloPecaInputField(
+                        controller: _modeloPecaController,
+                        onChanged: _salvarModeloPeca,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-
-            // Campo "Motivo" - DropdownButton
-            Positioned(
-              left: 360,
-              top: 320,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Motivo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 200,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.white, width: 1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _motivoSelecionado,
-                        isExpanded: true,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        items: _opcoesMotivo.map((Map<String, String> opcao) {
-                          return DropdownMenuItem<String>(
-                            value: opcao['value'],
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                opcao['label']!,
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? novoValor) {
-                          if (novoValor != null) {
-                            setState(() {
-                              _motivoSelecionado = novoValor;
-                            });
-                          }
-                        },
+                ),
+                const SizedBox(width: 20),
+                 Expanded(
+                   child: _buildInfoColumn(
+                    'Nº operador',
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFF00FF00), width: 3),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: _OperadorInputField(
+                        controller: _operadorController,
+                        onChanged: _salvarOperador,
                       ),
                     ),
-                  ),
-                ],
-              ),
+                   ),
+                 ),
+              ],
             ),
-
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+               Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                 children: [
+                   SizedBox(
+                    width: 250,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/tela3');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF9800),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                      ),
+                      child: const Text('HORA E TURNO',
+                          style: TextStyle(fontSize: 20, fontFamily: 'Roboto', fontWeight: FontWeight.bold)),
+                    ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: 250,
+                child: ElevatedButton(
+                  onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/tela2');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2DA8D1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                  ),
+                  child: const Text('CONF.',
+                      style: TextStyle(fontSize: 20, fontFamily: 'Roboto', fontWeight: FontWeight.bold)),
+                ),
+              ),
+                 ],
+               ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildInfoColumn(String label, {required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 10),
+        child,
+      ],
+    );
+  }
+
+  Widget _buildDropdown(String label, String value, List<Map<String, String>> items, ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+              items: items.map((Map<String, String> item) {
+                return DropdownMenuItem<String>(
+                  value: item['value'],
+                  child: Text(item['label']!, style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-// Widget separado para o campo do operador
 class _OperadorInputField extends StatefulWidget {
   final TextEditingController controller;
   final Function(String) onChanged;
-
   const _OperadorInputField({
     required this.controller,
     required this.onChanged,
@@ -706,52 +605,41 @@ class _OperadorInputFieldState extends State<_OperadorInputField> {
   void initState() {
     super.initState();
     widget.controller.addListener(() {
-      setState(() {
-        // Força a atualização quando o controlador muda
-      });
+      setState(() {});
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: widget.controller,
-      textAlign: TextAlign.center,
-      keyboardType: TextInputType.number,
-      maxLength: 5,
-      onChanged: (value) {
-        print('Valor do operador alterado para: $value');
-        setState(() {
-          // Força a atualização da interface
-        });
-        widget.onChanged(value);
-      },
-      style: const TextStyle(
-        color: Colors.black,
-        fontSize: 24, // Reduzido de 64 para 24 (proporcional à caixa)
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.bold,
-      ),
-      decoration: const InputDecoration(
-        border: InputBorder.none,
-        counterText: '', // Remove o contador de caracteres
-        hintText: '00000',
-        hintStyle: TextStyle(
-          color: Colors.black54,
-          fontSize: 24, // Reduzido de 64 para 24 (proporcional à caixa)
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: TextField(
+        controller: widget.controller,
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        maxLength: 5,
+        onChanged: (value) {
+          widget.onChanged(value);
+        },
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 24,
           fontFamily: 'Roboto',
           fontWeight: FontWeight.bold,
+        ),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          counterText: '',
+          contentPadding: EdgeInsets.zero,
         ),
       ),
     );
   }
 }
 
-// Widget para o campo de entrada do modelo da peça
 class _ModeloPecaInputField extends StatefulWidget {
   final TextEditingController controller;
   final Function(String) onChanged;
-
   const _ModeloPecaInputField({
     required this.controller,
     required this.onChanged,
@@ -766,9 +654,7 @@ class _ModeloPecaInputFieldState extends State<_ModeloPecaInputField> {
   void initState() {
     super.initState();
     widget.controller.addListener(() {
-      setState(() {
-        // Força a atualização quando o controlador muda
-      });
+      setState(() {});
     });
   }
 
@@ -777,28 +663,25 @@ class _ModeloPecaInputFieldState extends State<_ModeloPecaInputField> {
     return TextField(
       controller: widget.controller,
       textAlign: TextAlign.center,
-      keyboardType: TextInputType.text, // Aceita tanto números quanto letras
+      keyboardType: TextInputType.text,
       maxLength: 20,
-      textCapitalization: TextCapitalization.characters, // Converte para maiúsculas automaticamente
+      textCapitalization: TextCapitalization.characters,
       onChanged: (value) {
-        setState(() {
-          // Força a atualização da interface
-        });
         widget.onChanged(value);
       },
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 20, // Reduzido de 32 para 20 (mais fino)
+        fontSize: 20,
         fontFamily: 'Roboto',
         fontWeight: FontWeight.bold,
       ),
       decoration: const InputDecoration(
         border: InputBorder.none,
-        counterText: '', // Remove o contador de caracteres
+        counterText: '',
         hintText: 'ABC-123',
         hintStyle: TextStyle(
           color: Colors.black54,
-          fontSize: 20, // Reduzido de 32 para 20 (mais fino)
+          fontSize: 20,
           fontFamily: 'Roboto',
           fontWeight: FontWeight.bold,
         ),
