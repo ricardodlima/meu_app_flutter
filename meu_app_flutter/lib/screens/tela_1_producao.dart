@@ -414,7 +414,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                     });
                   }
                 }),
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
                 _buildDropdown('Motivo de Parada', _motivoParadaSelecionado, _opcoesMotivoParada, (val) {
                   if (val != null) {
                     setState(() {
