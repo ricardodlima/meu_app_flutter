@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/01_tela_1_producao.dart';
-import 'screens/05_tela_05_producao.dart';
-import 'screens/10_tela_10_hora_turno.dart';
-import 'screens/106_tela_de_producao.dart';
-import 'screens/103_configuracoes_screen.dart';
-import 'screens/102_config_ethernet_screen.dart';
-import 'screens/15_15_ajuste_Producao.dart';
+import 'screens/tela_1_producao.dart';
+import 'screens/tela_2_producao.dart';
+import 'screens/tela_3_hora_turno.dart';
+import 'screens/tela_de_producao.dart';
+import 'screens/configuracoes_screen.dart';
+import 'screens/config_ethernet_screen.dart';
+import 'screens/ajuste_producao.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
