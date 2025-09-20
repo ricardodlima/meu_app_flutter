@@ -6,13 +6,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/producao_service.dart';
 import '../services/network_control_service.dart';
 
+// NOME DA CLASSE CORRIGIDO AQUI
 class TelaDeProducao extends StatefulWidget {
   const TelaDeProducao({Key? key}) : super(key: key);
 
   @override
+  // E AQUI
   State<TelaDeProducao> createState() => _TelaDeProducaoState();
 }
 
+// E AQUI
 class _TelaDeProducaoState extends State<TelaDeProducao> {
   String _statusConexao = 'Desconectado';
   int _contador1 = 0;
@@ -57,7 +60,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     await prefs.setInt('contador1', valor);
   }
 
-  /// Verifica se o controle programático de rede é suportado
   Future<void> _verificarControleDeRede() async {
     try {
       final supported = await NetworkControlService.isNetworkControlSupported();
@@ -77,7 +79,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  /// Força o uso da rede Ethernet para comunicação com ESP32
   Future<void> _forcarRedeEthernet() async {
     if (!_networkControlSupported || !_ethernetAvailable) {
       print('Controle de rede não disponível');
@@ -105,7 +106,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  /// Força o uso da rede Wi-Fi para internet/Firebase
   Future<void> _forcarRedeWifi() async {
     if (!_networkControlSupported || !_wifiAvailable) {
       print('Controle de rede não disponível');
@@ -176,10 +176,8 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     });
     
     try {
-      // Força rede Ethernet para ESP32
       if (_networkControlSupported && _ethernetAvailable) {
         await _forcarRedeEthernet();
-        // Aguarda um pouco para a mudança de rede
         await Future.delayed(const Duration(milliseconds: 500));
       }
       
@@ -247,17 +245,13 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  // Função cérebro: sincroniza com o Firestore (somente estado global)
   Future<void> _sincronizarComFirebase(int novoValor) async {
-    // Força rede Wi-Fi para Firebase
     if (_networkControlSupported && _wifiAvailable) {
       await _forcarRedeWifi();
-      // Aguarda um pouco para a mudança de rede
       await Future.delayed(const Duration(milliseconds: 500));
     }
     
     try {
-      // Atualização simples do estado global
       await _producaoService.atualizarEstadoGlobal(novoValor);
       _ultimoValorFirebase = novoValor;
     } catch (e) {
@@ -267,7 +261,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
 
   void _processarResposta(String resposta) {
     if (_resetEmAndamento) {
-      // Durante o reset, ignoramos leituras para evitar sobrescrever o 0 no Firebase
       return;
     }
     resposta.split('\n').where((linha) => linha.trim().isNotEmpty).forEach((linha) {
@@ -281,7 +274,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                 _contador1 = int.tryParse(partes[1]) ?? 0;
               });
               _salvarContador1(_contador1);
-              // Integração Firestore: só sincroniza se mudou
               if (_contador1 != _ultimoValorFirebase) {
                 _sincronizarComFirebase(_contador1);
               }
@@ -348,11 +340,9 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                             _contador1 = 0;
                             _resetEmAndamento = true;
                           });
-                          // Se estiver conectado ao ESP32, envia o comando de reset primeiro
                           if (isConnected) {
                             _enviarComando('r1');
                           }
-                          // Garante escrita local imediata e sincronização levemente postergada
                           _salvarContador1(0);
                           Future.delayed(const Duration(milliseconds: 600), () async {
                             await _sincronizarComFirebase(0);
@@ -383,7 +373,6 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                   ),
                   const SizedBox(height: 24),
                   
-                  // Controles de rede
                   if (_networkControlSupported) ...[
                     Card(
                       child: Padding(
@@ -448,12 +437,11 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 80), // Espaço para o botão INICIO
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
           ),
-          // Botão INICIO no canto inferior esquerdo
           Positioned(
             bottom: 16,
             left: 16,
@@ -462,7 +450,7 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                 Navigator.pushReplacementNamed(context, '/tela1');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00BCD4), // Azul vibrante
+                backgroundColor: const Color(0xFF00BCD4),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -482,4 +470,5 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
       ),
     );
   }
-} 
+}
+

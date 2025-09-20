@@ -8,9 +8,6 @@ import 'screens/tela_de_producao.dart';
 import 'screens/configuracoes_screen.dart';
 import 'screens/config_ethernet_screen.dart';
 import 'screens/ajuste_producao.dart';
-import 'screens/tela_4_motiv_Subtrair.dart';
-// Import da nova tela de motivos de parada
-import 'screens/tela_5_Motiv_PARADA.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,11 +62,7 @@ class MyApp extends StatelessWidget {
         '/configuracoes': (context) => const ConfiguracoesScreen(),
         '/conf-ethernet': (context) => const ConfigEthernetScreen(),
         '/ajuste_producao': (context) => const AjusteProducao(),
-        '/tela4': (context) => const Tela4Motivo(),
-        // Rota para a nova tela de motivos de parada
-        '/tela5': (context) => const Tela5MotivoParada(),
       },
     );
   }
 }
-

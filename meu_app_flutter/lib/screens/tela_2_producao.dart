@@ -57,8 +57,9 @@ class Tela2Producao extends StatelessWidget {
                             const SizedBox(height: 20),
                             _buildMenuButton(
                               context: context,
-                              label: 'Cadastro de motivos\nde Subtrair peça', // TEXTO ALTERADO
+                              label: 'Cadastro de motivos\nde Subtrair peça',
                               onPressed: () {
+                                // ***** ESTA É A LINHA CORRIGIDA *****
                                 Navigator.pushReplacementNamed(context, '/tela4');
                               },
                               backgroundColor: const Color(0xFFFFA000), // Laranja
