@@ -59,8 +59,9 @@ class Tela2Producao extends StatelessWidget {
                               context: context,
                               label: 'Cadastro de motivos\nde Subtrair peça',
                               onPressed: () {
-                                // ***** ESTA É A LINHA CORRIGIDA *****
-                                Navigator.pushReplacementNamed(context, '/tela4');
+                                // ***** CORREÇÃO APLICADA AQUI *****
+                                // Navega para a tela de motivos de SUBTRAÇÃO
+                                Navigator.pushReplacementNamed(context, '/tela5');
                               },
                               backgroundColor: const Color(0xFFFFA000), // Laranja
                             ),
@@ -69,7 +70,8 @@ class Tela2Producao extends StatelessWidget {
                               context: context,
                               label: 'Cadastrar\nMotivos Parada',
                               onPressed: () {
-                                Navigator.pushReplacementNamed(context, '/tela5');
+                                // Navega para a tela de motivos de PARADA
+                                Navigator.pushReplacementNamed(context, '/tela4');
                               },
                               backgroundColor: const Color(0xFFF44336), // Vermelho
                             ),

@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class Tela4Motivo extends StatefulWidget {
-  const Tela4Motivo({Key? key}) : super(key: key);
+class Tela4MotivoParada extends StatefulWidget {
+  const Tela4MotivoParada({Key? key}) : super(key: key);
 
   @override
-  _Tela4MotivoState createState() => _Tela4MotivoState();
+  _Tela4MotivoParadaState createState() => _Tela4MotivoParadaState();
 }
 
-class _Tela4MotivoState extends State<Tela4Motivo> {
+class _Tela4MotivoParadaState extends State<Tela4MotivoParada> {
   late List<TextEditingController> _controllers;
   bool _isLoading = true;
+  final int _totalMotivos = 50;
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(50, (index) => TextEditingController());
+    _controllers = List.generate(_totalMotivos, (index) => TextEditingController());
     _carregarMotivos();
   }
 
@@ -30,8 +31,8 @@ class _Tela4MotivoState extends State<Tela4Motivo> {
   Future<void> _carregarMotivos() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      for (int i = 0; i < 50; i++) {
-        _controllers[i].text = prefs.getString('motivo_${i + 1}') ?? '';
+      for (int i = 0; i < _totalMotivos; i++) {
+        _controllers[i].text = prefs.getString('motivo_parada_${i + 1}') ?? '';
       }
       _isLoading = false;
     });
@@ -39,15 +40,17 @@ class _Tela4MotivoState extends State<Tela4Motivo> {
 
   Future<void> _salvarMotivos() async {
     final prefs = await SharedPreferences.getInstance();
-    for (int i = 0; i < 50; i++) {
-      await prefs.setString('motivo_${i + 1}', _controllers[i].text);
+    for (int i = 0; i < _totalMotivos; i++) {
+      await prefs.setString('motivo_parada_${i + 1}', _controllers[i].text);
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Motivos salvos com sucesso!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Motivos de parada salvos com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   @override
@@ -56,7 +59,7 @@ class _Tela4MotivoState extends State<Tela4Motivo> {
       backgroundColor: const Color(0xFF212121),
       appBar: AppBar(
         backgroundColor: const Color(0xFF303F9F),
-        title: const Text('Cadastro de Motivos de Parada'),
+        title: const Text('Cadastro de Motivos de PARADA'), // Título corrigido
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -67,8 +70,8 @@ class _Tela4MotivoState extends State<Tela4Motivo> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: 50,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              itemCount: _totalMotivos,
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -111,5 +114,3 @@ class _Tela4MotivoState extends State<Tela4Motivo> {
     );
   }
 }
-
-

@@ -8,6 +8,10 @@ import 'screens/tela_de_producao.dart';
 import 'screens/configuracoes_screen.dart';
 import 'screens/config_ethernet_screen.dart';
 import 'screens/ajuste_producao.dart';
+// Importações Corretas para as telas de motivo
+import 'screens/tela_4_motiv_PARADA.dart'; 
+import 'screens/tela_5_Motiv_Subtrat.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,7 +66,12 @@ class MyApp extends StatelessWidget {
         '/configuracoes': (context) => const ConfiguracoesScreen(),
         '/conf-ethernet': (context) => const ConfigEthernetScreen(),
         '/ajuste_producao': (context) => const AjusteProducao(),
+        
+        // --- ROTAS CORRIGIDAS E MAPEADAS CORRETAMENTE ---
+        '/tela4': (context) => const Tela4MotivoParada(), // Rota para tela de PARADA
+        '/tela5': (context) => const Tela5MotivoSubtrat(),  // Rota para tela de SUBTRAIR
       },
     );
   }
 }
+

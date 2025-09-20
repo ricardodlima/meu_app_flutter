@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class Tela5MotivoParada extends StatefulWidget {
-  const Tela5MotivoParada({Key? key}) : super(key: key);
+class Tela5MotivoSubtrat extends StatefulWidget {
+  const Tela5MotivoSubtrat({Key? key}) : super(key: key);
 
   @override
-  _Tela5MotivoParadaState createState() => _Tela5MotivoParadaState();
+  _Tela5MotivoSubtratState createState() => _Tela5MotivoSubtratState();
 }
 
-class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
+class _Tela5MotivoSubtratState extends State<Tela5MotivoSubtrat> {
   late List<TextEditingController> _controllers;
   bool _isLoading = true;
   final int _totalMotivos = 50;
@@ -32,7 +32,8 @@ class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       for (int i = 0; i < _totalMotivos; i++) {
-        _controllers[i].text = prefs.getString('motivo_parada_${i + 1}') ?? '';
+        // Chave correta para motivos de SUBTRAÇÃO
+        _controllers[i].text = prefs.getString('motivo_${i + 1}') ?? '';
       }
       _isLoading = false;
     });
@@ -41,12 +42,13 @@ class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
   Future<void> _salvarMotivos() async {
     final prefs = await SharedPreferences.getInstance();
     for (int i = 0; i < _totalMotivos; i++) {
-      await prefs.setString('motivo_parada_${i + 1}', _controllers[i].text);
+      // Chave correta para motivos de SUBTRAÇÃO
+      await prefs.setString('motivo_${i + 1}', _controllers[i].text);
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Motivos de parada salvos com sucesso!'),
+          content: Text('Motivos de subtração salvos com sucesso!'),
           backgroundColor: Colors.green,
         ),
       );
@@ -59,7 +61,7 @@ class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
       backgroundColor: const Color(0xFF212121),
       appBar: AppBar(
         backgroundColor: const Color(0xFF303F9F),
-        title: const Text('Cadastro de Motivo de Subtração do Valor Total'),
+        title: const Text('Cadastro de Motivos de SUBTRAIR PEÇA'), // Título corrigido
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -70,7 +72,7 @@ class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Espaço para o botão
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
               itemCount: _totalMotivos,
               itemBuilder: (context, index) {
                 return Padding(
@@ -114,4 +116,3 @@ class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
     );
   }
 }
-
