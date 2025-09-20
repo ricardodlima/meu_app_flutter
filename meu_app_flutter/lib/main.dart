@@ -8,7 +8,7 @@ import 'screens/tela_de_producao.dart';
 import 'screens/configuracoes_screen.dart';
 import 'screens/config_ethernet_screen.dart';
 import 'screens/ajuste_producao.dart';
-import 'screens/tela_4_motivo.dart';
+import 'screens/tela_4_motiv_Subtrair.dart';
 // Import da nova tela de motivos de parada
 import 'screens/tela_5_Motiv_PARADA.dart';
 

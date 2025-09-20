@@ -94,7 +94,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
     });
   }
 
-  // Função para selecionar o tempo de ciclo (controlador [2])
+  // Função genérica para selecionar o tempo
   Future<void> _selecionarTempo(int index, int controllerIndex) async {
     Duration duracaoInicial = Duration.zero;
     final tempoAtual = _controllers[index][controllerIndex].text;
@@ -197,13 +197,13 @@ class _AjusteProducaoState extends State<AjusteProducao> {
       child: const Row(
         children: [
           Expanded(flex: 2, child: Center(child: Text('Ativa', style: headerTextStyle))),
-          Expanded(flex: 4, child: Center(child: Text('Numero do programa', style: headerTextStyle, textAlign: TextAlign.center,))),
-          Expanded(flex: 5, child: Center(child: Text('MODELO PEÇA', style: headerTextStyle))),
+          Expanded(flex: 3, child: Center(child: Text('Numero do programa', style: headerTextStyle, textAlign: TextAlign.center,))),
+          Expanded(flex: 4, child: Center(child: Text('MODELO PEÇA', style: headerTextStyle))),
           Expanded(flex: 3, child: Center(child: Text('Tempo ciclo', style: headerTextStyle))),
           // Novo Cabeçalho
           Expanded(flex: 3, child: Center(child: Text('T. max de Parada', style: headerTextStyle, textAlign: TextAlign.center,))),
-          Expanded(flex: 4, child: Center(child: Text('Quantidade p/ ciclo', style: headerTextStyle, textAlign: TextAlign.center,))),
-          Expanded(flex: 3, child: Center(child: Text('Ferramentas', style: headerTextStyle))),
+          Expanded(flex: 3, child: Center(child: Text('Qtd p/ ciclo', style: headerTextStyle, textAlign: TextAlign.center,))),
+          Expanded(flex: 2, child: Center(child: Text('Ferramentas', style: headerTextStyle))),
         ],
       ),
     );
@@ -228,13 +228,13 @@ class _AjusteProducaoState extends State<AjusteProducao> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(flex: 2, child: _buildCheckbox(index)),
-                  Expanded(flex: 4, child: _buildNumericCell(_controllers[index][0])),
-                  Expanded(flex: 5, child: _buildEditableCell(_controllers[index][1])),
+                  Expanded(flex: 3, child: _buildNumericCell(_controllers[index][0])),
+                  Expanded(flex: 4, child: _buildEditableCell(_controllers[index][1])),
                   Expanded(flex: 3, child: _buildTempoCell(index, 2)), // Tempo de Ciclo
                   // Nova célula para T. max de Parada
                   Expanded(flex: 3, child: _buildTempoCell(index, 4)), // T. max de Parada
-                  Expanded(flex: 4, child: _buildNumericCell(_controllers[index][3])),
-                  Expanded(flex: 3, child: _buildBotaoFerramenta(index)),
+                  Expanded(flex: 3, child: _buildNumericCell(_controllers[index][3])),
+                  Expanded(flex: 2, child: _buildBotaoFerramenta(index)),
                 ],
               ),
             ),
@@ -359,3 +359,4 @@ class _AjusteProducaoState extends State<AjusteProducao> {
     );
   }
 }
+
