@@ -25,7 +25,7 @@ class Tela2Producao extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Área de conteúdo principal (expandida)
             Expanded(
               child: Container(
@@ -36,7 +36,7 @@ class Tela2Producao extends StatelessWidget {
                 ),
                 child: Stack(
                   children: [
-                    // Botão "Ajuste de Produção" no centro
+                    // Botão "Ajuste de Produção"
                     Positioned(
                       top: 50,
                       left: 50,
@@ -54,6 +54,58 @@ class Tela2Producao extends StatelessWidget {
                         ),
                         child: const Text(
                           'Ajuste de\nProdução',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Botão "Cadastrar Motivos"
+                    Positioned(
+                      top: 50,
+                      left: 250,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacementNamed(context, '/tela4');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFA000), // Laranja
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cadastrar\nMotivos',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // NOVO BOTÃO: Para a tela de cadastro de motivos de parada
+                    Positioned(
+                      top: 180,
+                      left: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacementNamed(context, '/tela5');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF44336), // Vermelho
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cadastrar\nMotivos Parada',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 18,
@@ -159,3 +211,4 @@ class Tela2Producao extends StatelessWidget {
     );
   }
 }
+

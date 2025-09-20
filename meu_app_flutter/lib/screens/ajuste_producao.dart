@@ -13,6 +13,7 @@ class AjusteProducao extends StatefulWidget {
 class _AjusteProducaoState extends State<AjusteProducao> {
   int? _linhaAtivaIndex;
   final int _totalLinhas = 20;
+  // Alterado para 5 colunas de dados para incluir "T. max de Parada"
   late List<List<TextEditingController>> _controllers;
 
   @override
@@ -22,9 +23,10 @@ class _AjusteProducaoState extends State<AjusteProducao> {
   }
 
   Future<void> _inicializarDados() async {
+    // Agora gera 5 controllers por linha
     _controllers = List.generate(
       _totalLinhas,
-      (i) => List.generate(4, (j) => TextEditingController()),
+      (i) => List.generate(5, (j) => TextEditingController()),
     );
     await _carregarDadosSalvos();
   }
@@ -38,29 +40,32 @@ class _AjusteProducaoState extends State<AjusteProducao> {
         _controllers[i][1].text = prefs.getString('linha_${i}_modelo') ?? 'PEÇA-${i + 1}';
         _controllers[i][2].text = prefs.getString('linha_${i}_tempo') ?? '00:00:00';
         _controllers[i][3].text = prefs.getString('linha_${i}_qtd') ?? '0';
+        // Carrega o novo campo "T. max de Parada"
+        _controllers[i][4].text = prefs.getString('linha_${i}_tempo_parada') ?? '00:00:00';
       }
     });
   }
 
-  // ALTERADO AQUI
   Future<void> _salvarDados() async {
     final prefs = await SharedPreferences.getInstance();
     if (_linhaAtivaIndex != null) {
       await prefs.setInt('linhaAtivaIndex', _linhaAtivaIndex!);
       
-      // Salva o modelo da peça ativo
       final modeloAtivo = _controllers[_linhaAtivaIndex!][1].text;
       await prefs.setString('modelo_peca', modeloAtivo);
       
-      // NOVO: Salva também o número do programa ativo
       final numProgramaAtivo = _controllers[_linhaAtivaIndex!][0].text;
       await prefs.setString('numero_programa', numProgramaAtivo);
+
+      // Salva o "T. max de Parada" da linha ativa para uso em outras telas
+      final tempoMaxParadaAtivo = _controllers[_linhaAtivaIndex!][4].text;
+      await prefs.setString('tempo_max_parada', tempoMaxParadaAtivo);
 
     } else {
       await prefs.remove('linhaAtivaIndex');
       await prefs.remove('modelo_peca');
-      // NOVO: Remove também o número do programa se nada for selecionado
       await prefs.remove('numero_programa');
+      await prefs.remove('tempo_max_parada'); // Remove também se nada for selecionado
     }
 
     for (int i = 0; i < _totalLinhas; i++) {
@@ -68,6 +73,8 @@ class _AjusteProducaoState extends State<AjusteProducao> {
       await prefs.setString('linha_${i}_modelo', _controllers[i][1].text);
       await prefs.setString('linha_${i}_tempo', _controllers[i][2].text);
       await prefs.setString('linha_${i}_qtd', _controllers[i][3].text);
+      // Salva o novo campo
+      await prefs.setString('linha_${i}_tempo_parada', _controllers[i][4].text);
     }
   }
 
@@ -87,9 +94,10 @@ class _AjusteProducaoState extends State<AjusteProducao> {
     });
   }
 
-  Future<void> _selecionarTempoCiclo(int index) async {
+  // Função para selecionar o tempo de ciclo (controlador [2])
+  Future<void> _selecionarTempo(int index, int controllerIndex) async {
     Duration duracaoInicial = Duration.zero;
-    final tempoAtual = _controllers[index][2].text;
+    final tempoAtual = _controllers[index][controllerIndex].text;
     
     final parts = tempoAtual.split(':');
     if (parts.length == 3) {
@@ -122,7 +130,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
                 child: const Text('Confirmar'),
                 onPressed: () {
                   setState(() {
-                    _controllers[index][2].text = _formatarDuracao(novaDuracao ?? Duration.zero);
+                    _controllers[index][controllerIndex].text = _formatarDuracao(novaDuracao ?? Duration.zero);
                   });
                   Navigator.pop(context);
                 },
@@ -179,7 +187,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
   }
   
   Widget _buildTableHeader() {
-    const headerTextStyle = TextStyle(color: Colors.white, fontWeight: FontWeight.bold);
+    const headerTextStyle = TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       decoration: const BoxDecoration(
@@ -189,10 +197,12 @@ class _AjusteProducaoState extends State<AjusteProducao> {
       child: const Row(
         children: [
           Expanded(flex: 2, child: Center(child: Text('Ativa', style: headerTextStyle))),
-          Expanded(flex: 4, child: Center(child: Text('Numero do programa', style: headerTextStyle))),
+          Expanded(flex: 4, child: Center(child: Text('Numero do programa', style: headerTextStyle, textAlign: TextAlign.center,))),
           Expanded(flex: 5, child: Center(child: Text('MODELO PEÇA', style: headerTextStyle))),
           Expanded(flex: 3, child: Center(child: Text('Tempo ciclo', style: headerTextStyle))),
-          Expanded(flex: 4, child: Center(child: Text('Quantidade p/ ciclo', style: headerTextStyle))),
+          // Novo Cabeçalho
+          Expanded(flex: 3, child: Center(child: Text('T. max de Parada', style: headerTextStyle, textAlign: TextAlign.center,))),
+          Expanded(flex: 4, child: Center(child: Text('Quantidade p/ ciclo', style: headerTextStyle, textAlign: TextAlign.center,))),
           Expanded(flex: 3, child: Center(child: Text('Ferramentas', style: headerTextStyle))),
         ],
       ),
@@ -220,7 +230,9 @@ class _AjusteProducaoState extends State<AjusteProducao> {
                   Expanded(flex: 2, child: _buildCheckbox(index)),
                   Expanded(flex: 4, child: _buildNumericCell(_controllers[index][0])),
                   Expanded(flex: 5, child: _buildEditableCell(_controllers[index][1])),
-                  Expanded(flex: 3, child: _buildTempoCicloCell(index)),
+                  Expanded(flex: 3, child: _buildTempoCell(index, 2)), // Tempo de Ciclo
+                  // Nova célula para T. max de Parada
+                  Expanded(flex: 3, child: _buildTempoCell(index, 4)), // T. max de Parada
                   Expanded(flex: 4, child: _buildNumericCell(_controllers[index][3])),
                   Expanded(flex: 3, child: _buildBotaoFerramenta(index)),
                 ],
@@ -293,9 +305,10 @@ class _AjusteProducaoState extends State<AjusteProducao> {
     );
   }
 
-  Widget _buildTempoCicloCell(int index) {
+  // Célula genérica para os campos de tempo
+  Widget _buildTempoCell(int index, int controllerIndex) {
     return InkWell(
-      onTap: () => _selecionarTempoCiclo(index),
+      onTap: () => _selecionarTempo(index, controllerIndex),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
         decoration: BoxDecoration(
@@ -304,7 +317,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
         ),
         alignment: Alignment.center,
         child: Text(
-          _controllers[index][2].text,
+          _controllers[index][controllerIndex].text,
           style: const TextStyle(color: Colors.black, fontSize: 14),
         ),
       ),

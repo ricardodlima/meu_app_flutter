@@ -61,7 +61,8 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
       {'value': '1', 'label': '1 - Dimensão'},
       {'value': '2', 'label': '2 - Quebra'},
     ];
-    for (int i = 3; i <= 10; i++) {
+    // ALTERADO: Loop agora vai até 50
+    for (int i = 3; i <= 50; i++) {
       opcoes.add({'value': i.toString(), 'label': '$i -'});
     }
     return opcoes;
@@ -337,6 +338,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Caixa 1: Valor da Produção e Zerar
           Container(
             padding: const EdgeInsets.all(10.0),
             decoration: BoxDecoration(
@@ -352,7 +354,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                     height: 50,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFADFF2F), // <-- COR ALTERADA
+                      color: const Color(0xFFADFF2F),
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(
@@ -383,6 +385,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
             ),
           ),
           const SizedBox(height: 10),
+          // Caixa 2: Subtrair e Motivo
           Container(
             padding: const EdgeInsets.all(10.0),
             decoration: BoxDecoration(
@@ -414,17 +417,25 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                     });
                   }
                 }),
-                const SizedBox(height: 20),
-                _buildDropdown('Motivo de Parada', _motivoParadaSelecionado, _opcoesMotivoParada, (val) {
-                  if (val != null) {
-                    setState(() {
-                      _motivoParadaSelecionado = val;
-                    });
-                  }
-                }),
               ],
             ),
-          )
+          ),
+          const SizedBox(height: 10),
+          // Caixa 3: Motivo de Parada
+          Container(
+            padding: const EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF303F9F),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: _buildDropdown('Motivo de Parada', _motivoParadaSelecionado, _opcoesMotivoParada, (val) {
+              if (val != null) {
+                setState(() {
+                  _motivoParadaSelecionado = val;
+                });
+              }
+            }),
+          ),
         ],
       ),
     );
@@ -709,4 +720,3 @@ class _ModeloPecaInputFieldState extends State<_ModeloPecaInputField> {
     );
   }
 }
-
