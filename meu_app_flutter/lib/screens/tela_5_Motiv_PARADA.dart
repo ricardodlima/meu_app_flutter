@@ -59,7 +59,7 @@ class _Tela5MotivoParadaState extends State<Tela5MotivoParada> {
       backgroundColor: const Color(0xFF212121),
       appBar: AppBar(
         backgroundColor: const Color(0xFF303F9F),
-        title: const Text('Cadastro de Motivos de Parada'),
+        title: const Text('Cadastro de Motivo de Subtração do Valor Total'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
