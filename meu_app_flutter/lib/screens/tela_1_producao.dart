@@ -2,9 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// Enum para representar o status da produção de forma clara e segura.
+// Usar um enum é melhor do que usar Strings ("PRODUZINDO", "PARADA")
+// porque evita erros de digitação.
+enum StatusProducao { produzindo, parada }
+
 
 // Supondo que este seja o caminho correto para o seu serviço
 // import '../services/network_control_service.dart';
@@ -38,29 +43,13 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   late TextEditingController _operadorController;
   late TextEditingController _modeloPecaController;
   late TextEditingController _numeroProgramaController;
-  String _statusMaquinaSelecionado = '1';
   String _motivoSelecionado = '1';
+  String _motivoParadaSelecionado = '1';
 
-  // Lista para armazenar os motivos de parada carregados
-  List<Map<String, String>> _opcoesMotivoParada = [];
-  // Variável para armazenar o motivo de parada selecionado
-  String? _motivoParadaSelecionado;
+  // NOVA VARIÁVEL DE ESTADO para controlar o status da máquina.
+  // Ela começa com o valor 'produzindo'.
+  StatusProducao _statusProducao = StatusProducao.produzindo;
 
-  List<Map<String, String>> get _opcoesStatusMaquina {
-    List<Map<String, String>> opcoes = [
-      {'value': '1', 'label': '1 - Maquina em produção'},
-      {'value': '2', 'label': '2 - Maquina Parada'},
-      {'value': '3', 'label': '3 - Em Preparação'},
-      {'value': '4', 'label': '4 - Em ajuste de Programa'},
-      {'value': '5', 'label': '5 - Em Manutenção'},
-      {'value': '6', 'label': '6 - Parada Banheiro'},
-      {'value': '7', 'label': '7 - Para Refeição'},
-    ];
-    for (int i = 8; i <= 50; i++) {
-      opcoes.add({'value': i.toString(), 'label': '$i - Opção $i'});
-    }
-    return opcoes;
-  }
 
   List<Map<String, String>> get _opcoesMotivo {
     List<Map<String, String>> opcoes = [
@@ -71,6 +60,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     for (int i = 3; i <= 50; i++) {
       opcoes.add({'value': i.toString(), 'label': '$i -'});
     }
+    return opcoes;
+  }
+
+  List<Map<String, String>> get _opcoesMotivoParada {
+    List<Map<String, String>> opcoes = [
+      {'value': '1', 'label': '1 - ALMOCO'},
+      {'value': '2', 'label': '2 - BANHEIRO'},
+      {'value': '3', 'label': '3 - Setup'},
+      {'value': '4', 'label': '4 - Limpeza'},
+      {'value': '5', 'label': '5 - Outro'},
+    ];
     return opcoes;
   }
 
@@ -110,7 +110,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     await _carregarOperadorSalvo();
     await _carregarModeloPecaSalvo();
     await _carregarNumeroProgramaSalvo();
-    await _carregarMotivosDeParada(); // Carrega os motivos de parada
     _verificarControleDeRede();
     _startAutoConnect();
   }
@@ -159,88 +158,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     await prefs.setString('modelo_peca', modelo);
   }
 
-  // --- MÉTODOS ADICIONADOS ---
-
-  /// Carrega os motivos de parada salvos na tela 5.
-  Future<void> _carregarMotivosDeParada() async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<Map<String, String>> motivosCarregados = [];
-    for (int i = 1; i <= 50; i++) {
-      final motivo = prefs.getString('motivo_parada_$i');
-      if (motivo != null && motivo.isNotEmpty) {
-        motivosCarregados.add({'value': i.toString(), 'label': '$i - $motivo'});
-      }
-    }
-    setState(() {
-      _opcoesMotivoParada = motivosCarregados;
-      // Define o primeiro motivo como selecionado, se houver algum
-      if (_opcoesMotivoParada.isNotEmpty) {
-        _motivoParadaSelecionado = _opcoesMotivoParada.first['value'];
-      }
-    });
-  }
-
-  /// Salva o registro da subtração no Firestore.
-  Future<void> _salvarSubtracaoNoFirestore() async {
-    if (_motivoParadaSelecionado == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, selecione um motivo de parada.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final motivoLabel = _opcoesMotivoParada
-        .firstWhere((element) => element['value'] == _motivoParadaSelecionado,
-            orElse: () => {'label': 'Motivo não encontrado'})['label'];
-
-    try {
-      await FirebaseFirestore.instance.collection('subtracoes').add({
-        'contador_valor_apos_subtracao': _contador1,
-        'motivo_id': _motivoParadaSelecionado,
-        'motivo_label': motivoLabel,
-        'timestamp': FieldValue.serverTimestamp(),
-        'operador': _operadorController.text,
-        'modelo_peca': _modeloPecaController.text,
-        'numero_programa': _numeroProgramaController.text,
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Subtração salva no banco de dados.'),
-          backgroundColor: Colors.blue,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao salvar no banco de dados: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // --- MÉTODO ALTERADO ---
   void _subtrairContagem() {
     if (_contador1 > 0) {
       setState(() {
         _contador1--;
       });
       _salvarContador1(_contador1);
-
-      // Salva a informação no Firestore
-      _salvarSubtracaoNoFirestore();
-
       if (_socket != null) {
-        // Se precisar enviar um comando para o ESP32, mantenha aqui
-        // _enviarComando('subtrair_c1'); por exemplo
+        _enviarComando('r1');
       }
     }
   }
-
-  // --- RESTANTE DO CÓDIGO (sem alterações) ---
 
   Future<void> _verificarControleDeRede() async {
     try {
@@ -362,9 +290,10 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
 
   void _processarResposta(String resposta) {
     if (!mounted) return;
-    resposta.split('\n').where((linha) => linha.trim().isNotEmpty).forEach((
-      linha,
-    ) {
+    resposta
+        .split('\n')
+        .where((linha) => linha.trim().isNotEmpty)
+        .forEach((linha) {
       if (linha.startsWith('C1:')) {
         final dados = linha.split(',');
         for (var dado in dados) {
@@ -402,6 +331,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     );
   }
 
+
   Widget _buildLeftColumn() {
     return SizedBox(
       width: 298,
@@ -410,7 +340,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
         children: [
           // Caixa 1: Valor da Produção e Zerar
           Container(
-            padding: const EdgeInsets.all(10.0),
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
@@ -421,7 +351,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                 _buildInfoColumn(
                   'Valor Atual da Produção',
                   child: Container(
-                    height: 50,
+                    height: 40,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: const Color(0xFFADFF2F),
@@ -432,12 +362,12 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                           color: Colors.black,
-                          fontSize: 40,
+                          fontSize: 32,
                           fontFamily: 'Roboto'),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
@@ -451,20 +381,20 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(5)),
                   ),
                   child: const Text('Zerar Contagem',
-                      style: TextStyle(fontSize: 24, fontFamily: 'Roboto')),
+                      style: TextStyle(fontSize: 18, fontFamily: 'Roboto')),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           // Caixa 2: Subtrair e Motivo
           Container(
-            padding: const EdgeInsets.all(10.0),
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
@@ -477,7 +407,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                       side: const BorderSide(color: Colors.red, width: 2),
@@ -485,11 +415,11 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                   ),
                   child: const Text('Subtrair Contagem 1',
                       style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 _buildDropdown('Motivo', _motivoSelecionado, _opcoesMotivo,
                     (val) {
                   if (val != null) {
@@ -501,15 +431,14 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           // Caixa 3: Motivo de Parada
           Container(
-            padding: const EdgeInsets.all(10.0),
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
             ),
-            // Alteração aqui para usar os motivos de parada carregados
             child: _buildDropdown(
                 'Motivo de Parada', _motivoParadaSelecionado, _opcoesMotivoParada,
                 (val) {
@@ -519,6 +448,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                 });
               }
             }),
+          ),
+          const SizedBox(height: 8), // Espaçamento antes do novo widget
+          
+          // Botão de Status da Produção - Movido para coluna esquerda
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF303F9F),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: _buildStatusSelector(),
           ),
         ],
       ),
@@ -606,7 +546,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -633,7 +573,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                               fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: 250,
                     child: ElevatedButton(
@@ -663,6 +603,55 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     );
   }
 
+  // NOVO WIDGET para criar o seletor de status
+  Widget _buildStatusSelector() {
+    return Center(
+      child: ToggleButtons(
+        // Define quais botões estão selecionados
+        isSelected: [
+          _statusProducao == StatusProducao.produzindo,
+          _statusProducao == StatusProducao.parada,
+        ],
+        // Função chamada quando um botão é pressionado
+        onPressed: (int index) {
+          setState(() {
+            // Atualiza a variável de estado com base no botão clicado
+            _statusProducao =
+                index == 0 ? StatusProducao.produzindo : StatusProducao.parada;
+            
+            // Aqui você pode adicionar a lógica para enviar o status
+            // para a máquina ou para o banco de dados.
+            // Exemplo: print("Status alterado para: $_statusProducao");
+          });
+        },
+        // Estilização dinâmica baseada no status selecionado
+        color: Colors.white.withOpacity(0.7), // Cor do texto não selecionado
+        selectedColor: Colors.white,         // Cor do texto selecionado
+        fillColor: _statusProducao == StatusProducao.produzindo 
+            ? Colors.green  // Verde para PRODUZINDO
+            : Colors.red,   // Vermelho para PARADA
+        borderColor: _statusProducao == StatusProducao.produzindo 
+            ? Colors.green 
+            : Colors.red,
+        selectedBorderColor: Colors.white,
+        borderRadius: BorderRadius.circular(5.0),
+        borderWidth: 2,
+        children: <Widget>[
+          // Botão "PRODUZINDO"
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text('PRODUZINDO', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          // Botão "PARADA"
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text('PARADA', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoColumn(String label, {required Widget child}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,13 +661,13 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           style: const TextStyle(
               color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         child,
       ],
     );
   }
 
-  Widget _buildDropdown(String label, String? value,
+  Widget _buildDropdown(String label, String value,
       List<Map<String, String>> items, ValueChanged<String?> onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,9 +677,9 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           style: const TextStyle(
               color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Container(
-          height: 50,
+          height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 12.0),
           decoration: BoxDecoration(
             color: Colors.white,

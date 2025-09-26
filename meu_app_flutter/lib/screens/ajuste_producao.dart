@@ -179,7 +179,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
         'Ajuste de Produção',
         style: TextStyle(
           color: Color(0xFFD0D0D0),
-          fontSize: 22,
+          fontSize: 18,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -187,7 +187,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
   }
   
   Widget _buildTableHeader() {
-    const headerTextStyle = TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12);
+    const headerTextStyle = TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       decoration: const BoxDecoration(
@@ -273,7 +273,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
       child: TextFormField(
         controller: controller,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: Colors.black, fontSize: 14),
+        style: const TextStyle(color: Colors.black, fontSize: 10),
         decoration: const InputDecoration(
           border: InputBorder.none,
           isDense: true,
@@ -295,7 +295,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        style: const TextStyle(color: Colors.black, fontSize: 14),
+        style: const TextStyle(color: Colors.black, fontSize: 10),
         decoration: const InputDecoration(
           border: InputBorder.none,
           isDense: true,
@@ -318,7 +318,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
         alignment: Alignment.center,
         child: Text(
           _controllers[index][controllerIndex].text,
-          style: const TextStyle(color: Colors.black, fontSize: 14),
+          style: const TextStyle(color: Colors.black, fontSize: 10),
         ),
       ),
     );
@@ -353,7 +353,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
         ),
         child: const Text(
           'INICIO',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
       ),
     );
