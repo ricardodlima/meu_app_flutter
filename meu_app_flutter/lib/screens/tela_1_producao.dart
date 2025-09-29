@@ -896,7 +896,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
               _iniciarTimerCiclo();
             } else {
               _pararTimerCiclo();
-              _pararPiscar();
+              // NÃO para o piscar quando muda para PARADA - continua piscando até motivo ser selecionado
               setState(() {
                 _segundosCiclo = 0;
                 // NÃO remove o alerta quando muda para PARADA - só remove quando motivo for selecionado
