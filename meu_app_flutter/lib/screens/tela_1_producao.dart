@@ -899,7 +899,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
               _pararPiscar();
               setState(() {
                 _segundosCiclo = 0;
-                _emAlerta = false;
+                // NÃO remove o alerta quando muda para PARADA - só remove quando motivo for selecionado
               });
             }
           });
