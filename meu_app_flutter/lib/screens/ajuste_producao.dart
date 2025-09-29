@@ -57,6 +57,10 @@ class _AjusteProducaoState extends State<AjusteProducao> {
       final numProgramaAtivo = _controllers[_linhaAtivaIndex!][0].text;
       await prefs.setString('numero_programa', numProgramaAtivo);
 
+      // Salva o "Tempo de Ciclo" da linha ativa para uso em outras telas
+      final tempoCicloAtivo = _controllers[_linhaAtivaIndex!][2].text;
+      await prefs.setString('tempo_ciclo_ativo', tempoCicloAtivo);
+      
       // Salva o "T. max de Parada" da linha ativa para uso em outras telas
       final tempoMaxParadaAtivo = _controllers[_linhaAtivaIndex!][4].text;
       await prefs.setString('tempo_max_parada', tempoMaxParadaAtivo);
@@ -65,6 +69,7 @@ class _AjusteProducaoState extends State<AjusteProducao> {
       await prefs.remove('linhaAtivaIndex');
       await prefs.remove('modelo_peca');
       await prefs.remove('numero_programa');
+      await prefs.remove('tempo_ciclo_ativo'); // Remove também se nada for selecionado
       await prefs.remove('tempo_max_parada'); // Remove também se nada for selecionado
     }
 

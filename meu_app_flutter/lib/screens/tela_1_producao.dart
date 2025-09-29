@@ -50,6 +50,14 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   // Ela começa com o valor 'produzindo'.
   StatusProducao _statusProducao = StatusProducao.produzindo;
 
+  // Variáveis para monitoramento de tempo de ciclo
+  Timer? _timerCiclo;
+  Timer? _timerPiscar;
+  int _segundosCiclo = 0;
+  bool _emAlerta = false;
+  bool _piscando = false;
+  int _tempoCicloLimite = 11; // Valor padrão, será atualizado dinamicamente da linha ativa
+
 
   List<Map<String, String>> get _opcoesMotivo {
     List<Map<String, String>> opcoes = [
@@ -93,9 +101,18 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recarrega tempo limite quando a tela é reconstruída
+    _recarregarTempoLimite();
+  }
+
+  @override
   void dispose() {
     _pollingTimer?.cancel();
     _reconnectTimer?.cancel();
+    _timerCiclo?.cancel();
+    _timerPiscar?.cancel();
     _socket?.destroy();
     _ipController.dispose();
     _portController.dispose();
@@ -110,6 +127,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     await _carregarOperadorSalvo();
     await _carregarModeloPecaSalvo();
     await _carregarNumeroProgramaSalvo();
+    await _carregarTempoLimiteDinamico();
     _verificarControleDeRede();
     _startAutoConnect();
   }
@@ -156,6 +174,41 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   Future<void> _salvarModeloPeca(String modelo) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('modelo_peca', modelo);
+  }
+
+  // Converte tempo HH:MM:SS para segundos
+  int _converterTempoParaSegundos(String tempo) {
+    final parts = tempo.split(':');
+    if (parts.length == 3) {
+      int horas = int.tryParse(parts[0]) ?? 0;
+      int minutos = int.tryParse(parts[1]) ?? 0;
+      int segundos = int.tryParse(parts[2]) ?? 0;
+      return horas * 3600 + minutos * 60 + segundos;
+    }
+    return 0;
+  }
+
+  Future<void> _carregarTempoLimiteDinamico() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Carrega tempo de ciclo e tempo max de parada da linha ativa
+    final tempoCiclo = prefs.getString('tempo_ciclo_ativo') ?? '00:00:00';
+    final tempoMaxParada = prefs.getString('tempo_max_parada') ?? '00:00:00';
+    
+    // Converte para segundos e soma
+    final segundosCiclo = _converterTempoParaSegundos(tempoCiclo);
+    final segundosMaxParada = _converterTempoParaSegundos(tempoMaxParada);
+    
+    setState(() {
+      _tempoCicloLimite = segundosCiclo + segundosMaxParada;
+    });
+    
+    print('Tempo limite carregado: ${segundosCiclo}s + ${segundosMaxParada}s = ${_tempoCicloLimite}s');
+  }
+
+  // Método para recarregar tempo limite (útil quando voltar da tela de ajuste)
+  Future<void> _recarregarTempoLimite() async {
+    await _carregarTempoLimiteDinamico();
   }
 
   void _subtrairContagem() {
@@ -304,6 +357,8 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                 _contador1 = int.tryParse(partes[1]) ?? 0;
               });
               _salvarContador1(_contador1);
+              // ZERAR TIMER DE CICLO quando recebe pulso ESP32
+              _zerarTimerCiclo();
             }
           }
         }
@@ -313,24 +368,159 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF262526),
-      body: Padding(
-        padding: const EdgeInsets.all(40.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildLeftColumn(),
-            const SizedBox(width: 20),
-            _buildRightColumn(),
-          ],
-        ),
+  // Métodos para controle do timer de ciclo
+  void _iniciarTimerCiclo() {
+    if (_statusProducao == StatusProducao.produzindo && !_emAlerta) {
+      _timerCiclo?.cancel();
+      _timerCiclo = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted && _statusProducao == StatusProducao.produzindo) {
+          setState(() {
+            _segundosCiclo++;
+          });
+          _verificarLimiteTempo();
+        }
+      });
+    }
+  }
+
+  void _pararTimerCiclo() {
+    _timerCiclo?.cancel();
+  }
+
+  void _zerarTimerCiclo() {
+    setState(() {
+      _segundosCiclo = 0;
+      // NÃO remove o alerta automaticamente - só remove quando motivo for selecionado
+    });
+    _pararTimerCiclo();
+    _iniciarTimerCiclo();
+  }
+
+  void _zerarTimerEAlerta() {
+    setState(() {
+      _segundosCiclo = 0;
+      _emAlerta = false;
+    });
+    _pararPiscar();
+    _pararTimerCiclo();
+    _iniciarTimerCiclo();
+  }
+
+  void _verificarLimiteTempo() {
+    if (_segundosCiclo > _tempoCicloLimite && !_emAlerta) {
+      setState(() {
+        _emAlerta = true;
+      });
+      _iniciarPiscar();
+      // Não mostrar diálogo - usar dropdown existente
+    }
+  }
+
+  void _iniciarPiscar() {
+    _timerPiscar?.cancel();
+    _timerPiscar = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (mounted && _emAlerta) {
+        setState(() {
+          _piscando = !_piscando;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _pararPiscar() {
+    _timerPiscar?.cancel();
+    setState(() {
+      _piscando = false;
+    });
+  }
+
+
+
+  void _confirmarMotivoParadaDropdown(String motivoValue) {
+    // Encontrar o motivo correspondente ao valor selecionado
+    String motivo = _opcoesMotivoParada.firstWhere(
+      (opcao) => opcao['value'] == motivoValue,
+      orElse: () => {'value': motivoValue, 'label': 'Motivo desconhecido'}
+    )['label']!;
+    
+    // Usar o método que zera timer E remove alerta
+    _zerarTimerEAlerta();
+    
+    // Salvar motivo e timestamp no histórico
+    print('Motivo da parada: $motivo - Tempo: ${_formatarTempo(_segundosCiclo)}');
+    
+    // Mostrar confirmação visual
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Motivo registrado: $motivo'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
+  String _formatarTempo(int segundos) {
+    int horas = segundos ~/ 3600;
+    int minutos = (segundos % 3600) ~/ 60;
+    int segs = segundos % 60;
+    return '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}:${segs.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF262526),
+      body: Column(
+        children: [
+          // Barra de alerta piscante
+          if (_emAlerta) _buildBarraAlerta(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(40.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLeftColumn(),
+                  const SizedBox(width: 20),
+                  _buildRightColumn(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget para barra de alerta piscante
+  Widget _buildBarraAlerta() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+      decoration: BoxDecoration(
+        color: _piscando ? Colors.red : Colors.green,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          'Tempo de ciclo excedido. Selecione o motivo na caixa "Motivo de Parada".',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildLeftColumn() {
     return SizedBox(
@@ -340,7 +530,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
         children: [
           // Caixa 1: Valor da Produção e Zerar
           Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
@@ -351,7 +541,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                 _buildInfoColumn(
                   'Valor Atual da Produção',
                   child: Container(
-                    height: 40,
+                    height: 35,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: const Color(0xFFADFF2F),
@@ -362,31 +552,41 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                           color: Colors.black,
-                          fontSize: 32,
+                          fontSize: 28,
                           fontFamily: 'Roboto'),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _contador1 = 0;
-                    });
-                    _salvarContador1(0);
-                    if (_socket != null) {
-                      _enviarComando('r1');
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5)),
-                  ),
-                  child: const Text('Zerar Contagem',
-                      style: TextStyle(fontSize: 18, fontFamily: 'Roboto')),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTempoCicloDisplayCompact(),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _contador1 = 0;
+                          });
+                          _salvarContador1(0);
+                          if (_socket != null) {
+                            _enviarComando('r1');
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5)),
+                        ),
+                        child: const Text('Zerar Contagem',
+                            style: TextStyle(fontSize: 14, fontFamily: 'Roboto')),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -394,7 +594,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           const SizedBox(height: 8),
           // Caixa 2: Subtrair e Motivo
           Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
@@ -407,7 +607,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                       side: const BorderSide(color: Colors.red, width: 2),
@@ -415,11 +615,11 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                   ),
                   child: const Text('Subtrair Contagem 1',
                       style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 _buildDropdown('Motivo', _motivoSelecionado, _opcoesMotivo,
                     (val) {
                   if (val != null) {
@@ -431,10 +631,10 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // Caixa 3: Motivo de Parada
           Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
@@ -446,14 +646,18 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                 setState(() {
                   _motivoParadaSelecionado = val;
                 });
+                // Se está em alerta, confirmar motivo e zerar timer
+                if (_emAlerta) {
+                  _confirmarMotivoParadaDropdown(val);
+                }
               }
             }),
           ),
-          const SizedBox(height: 8), // Espaçamento antes do novo widget
+          const SizedBox(height: 6), // Espaçamento antes do novo widget
           
           // Botão de Status da Produção - Movido para coluna esquerda
           Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(6.0),
             decoration: BoxDecoration(
               color: const Color(0xFF303F9F),
               borderRadius: BorderRadius.circular(5),
@@ -546,7 +750,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -573,7 +777,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                               fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: 250,
                     child: ElevatedButton(
@@ -594,10 +798,78 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                               fontWeight: FontWeight.bold)),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: 250,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _contador1++;
+                        });
+                        _salvarContador1(_contador1);
+                        // Zera o timer de ciclo porque uma peça foi produzida manualmente
+                        _zerarTimerCiclo();
+                        if (_socket != null) {
+                          _enviarComando('+1');
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5)),
+                      ),
+                      child: const Text('+ +1',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.bold)),
+                    ),
+                  ),
                 ],
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  // Widget compacto para mostrar o tempo de ciclo (no lugar do botão +1)
+  Widget _buildTempoCicloDisplayCompact() {
+    return Container(
+      height: 35,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _emAlerta ? Colors.red.withOpacity(0.3) : const Color(0xFF2D3980),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(
+          color: _emAlerta ? Colors.red : const Color(0xFF2D3980),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            _formatarTempo(_segundosCiclo),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _emAlerta ? Colors.white : Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (_statusProducao == StatusProducao.produzindo && !_emAlerta)
+            Text(
+              'Lim: ${_formatarTempo(_tempoCicloLimite)}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 8,
+              ),
+            ),
         ],
       ),
     );
@@ -619,9 +891,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
             _statusProducao =
                 index == 0 ? StatusProducao.produzindo : StatusProducao.parada;
             
-            // Aqui você pode adicionar a lógica para enviar o status
-            // para a máquina ou para o banco de dados.
-            // Exemplo: print("Status alterado para: $_statusProducao");
+            // Controla o timer de ciclo baseado no status
+            if (_statusProducao == StatusProducao.produzindo) {
+              _iniciarTimerCiclo();
+            } else {
+              _pararTimerCiclo();
+              _pararPiscar();
+              setState(() {
+                _segundosCiclo = 0;
+                _emAlerta = false;
+              });
+            }
           });
         },
         // Estilização dinâmica baseada no status selecionado
@@ -661,7 +941,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           style: const TextStyle(
               color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         child,
       ],
     );
@@ -677,7 +957,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
           style: const TextStyle(
               color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Container(
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 12.0),
