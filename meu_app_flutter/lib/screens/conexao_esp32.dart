@@ -5,26 +5,22 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/producao_service.dart';
 import '../services/network_control_service.dart';
+import '../services/esp32_connection_service.dart';
 
-// NOME DA CLASSE CORRIGIDO AQUI
-class TelaDeProducao extends StatefulWidget {
-  const TelaDeProducao({Key? key}) : super(key: key);
+// Tela de Conexão ESP32 - Monitoramento do Contador
+class ConexaoEsp32 extends StatefulWidget {
+  const ConexaoEsp32({Key? key}) : super(key: key);
 
   @override
-  // E AQUI
-  State<TelaDeProducao> createState() => _TelaDeProducaoState();
+  State<ConexaoEsp32> createState() => _ConexaoEsp32State();
 }
 
-// E AQUI
-class _TelaDeProducaoState extends State<TelaDeProducao> {
+class _ConexaoEsp32State extends State<ConexaoEsp32> {
   String _statusConexao = 'Desconectado';
   int _contador1 = 0;
   bool _emProcessoDeConexao = false;
   bool _resetEmAndamento = false;
 
-  Socket? _socket;
-  Timer? _pollingTimer;
-  Timer? _reconnectTimer;
   late TextEditingController _ipController;
   late TextEditingController _portController;
 
@@ -37,14 +33,41 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
   bool _ethernetAvailable = false;
   bool _wifiAvailable = false;
 
+  // Serviço compartilhado ESP32
+  final Esp32ConnectionService _esp32Service = Esp32ConnectionService();
+
   @override
   void initState() {
     super.initState();
     _ipController = TextEditingController(text: '192.168.1.100');
     _portController = TextEditingController(text: '8080');
+    
+    // Configurar listeners do serviço ESP32
+    _esp32Service.addStatusListener(_onStatusChanged);
+    _esp32Service.addContadorListener(_onContadorChanged);
+    _esp32Service.addConnectionListener(_onConnectionChanged);
+    
     _carregarContadorSalvo();
     _verificarControleDeRede();
-    _startAutoConnect();
+    
+    // Configurar e iniciar serviço ESP32
+    print("Tela Conexão ESP32 - Configurando serviço..."); // DEBUG
+    _esp32Service.setConfig(_ipController.text, _portController.text);
+    _esp32Service.startAutoConnect();
+    print("Tela Conexão ESP32 - Serviço iniciado"); // DEBUG
+    
+    // Usar o serviço compartilhado
+    _statusConexao = _esp32Service.statusConexao;
+    _contador1 = _esp32Service.contador1;
+    _emProcessoDeConexao = _esp32Service.emProcessoDeConexao;
+    
+    // Forçar conexão após um pequeno delay se não estiver conectado
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!_esp32Service.isConnected) {
+        print("Tela Conexão ESP32 - Forçando reconexão..."); // DEBUG
+        _esp32Service.forceReconnect();
+      }
+    });
   }
 
   Future<void> _carregarContadorSalvo() async {
@@ -133,33 +156,21 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  void _startAutoConnect() {
-    _tryConnect();
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_socket == null && !_emProcessoDeConexao) {
-        _tryConnect();
-      }
-    });
-  }
-
-  void _tryConnect() {
-    if (!_emProcessoDeConexao && _socket == null) {
-      _iniciarConexao();
-    }
-  }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
-    _reconnectTimer?.cancel();
-    _socket?.destroy();
+    // Remover listeners do serviço ESP32
+    _esp32Service.removeStatusListener(_onStatusChanged);
+    _esp32Service.removeContadorListener(_onContadorChanged);
+    _esp32Service.removeConnectionListener(_onConnectionChanged);
+    
     _ipController.dispose();
     _portController.dispose();
     super.dispose();
   }
 
-  void _atualizarStatus(String status) {
+  // Callbacks do serviço ESP32
+  void _onStatusChanged(String status) {
     if (mounted) {
       setState(() {
         _statusConexao = status;
@@ -167,83 +178,26 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  Future<void> _iniciarConexao() async {
-    if (_emProcessoDeConexao || _socket != null) return;
-
-    setState(() {
-      _emProcessoDeConexao = true;
-      _atualizarStatus('Conectando a ${_ipController.text}:${_portController.text}...');
-    });
-    
-    try {
-      if (_networkControlSupported && _ethernetAvailable) {
-        await _forcarRedeEthernet();
-        await Future.delayed(const Duration(milliseconds: 500));
+  void _onContadorChanged(int contador) {
+    if (mounted) {
+      setState(() {
+        _contador1 = contador;
+      });
+      _salvarContador1(contador);
+      if (contador != _ultimoValorFirebase) {
+        _sincronizarComFirebase(contador);
       }
-      
-      final ip = _ipController.text;
-      final port = int.tryParse(_portController.text) ?? 8080;
-
-      _socket = await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
-      _atualizarStatus('Conectado a $ip:$port');
-      
-      _socket!.listen(
-        (List<int> dados) {
-          final resposta = utf8.decode(dados).trim();
-          _processarResposta(resposta);
-        },
-        onError: (error) {
-          _handleDesconexao(erro: error.toString());
-        },
-        onDone: () {
-          _handleDesconexao();
-        },
-        cancelOnError: true,
-      );
-
-      _iniciarPolling();
-      
-    } catch (e) {
-      _handleDesconexao(erro: e.toString());
-    } finally {
-      if(mounted) setState(() => _emProcessoDeConexao = false);
     }
   }
 
-  void _handleDesconexao({String? erro}) {
-    _pollingTimer?.cancel();
-    _socket?.destroy();
-    _socket = null;
+  void _onConnectionChanged(bool connected) {
     if (mounted) {
       setState(() {
-        _emProcessoDeConexao = false;
-        String erroMsg = erro != null ? erro.split(':').last.trim() : 'Desconectado';
-        if (erroMsg.contains("errno = 101")) erroMsg = "Rede inalcançável. Verifique o IP e a rede da IHM.";
-        if (erroMsg.contains("errno = 111")) erroMsg = "Conexão recusada. Verifique o IP/Porta e se o ESP32 está ligado.";
-        if (erroMsg.contains("timed out")) erroMsg = "Tempo esgotado. Verifique o IP e a rede.";
-        _statusConexao = erro != null ? 'Erro: $erroMsg' : 'Desconectado';
+        _emProcessoDeConexao = !connected && _esp32Service.emProcessoDeConexao;
       });
     }
   }
 
-  void _iniciarPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (_socket != null) {
-        _enviarComando('getcounts');
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  void _enviarComando(String comando) {
-    if (_socket != null) {
-      _socket!.writeln(comando);
-    } else {
-      _atualizarStatus("Erro: Não conectado.");
-    }
-  }
 
   Future<void> _sincronizarComFirebase(int novoValor) async {
     if (_networkControlSupported && _wifiAvailable) {
@@ -259,40 +213,14 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     }
   }
 
-  void _processarResposta(String resposta) {
-    if (_resetEmAndamento) {
-      return;
-    }
-    resposta.split('\n').where((linha) => linha.trim().isNotEmpty).forEach((linha) {
-      if (linha.startsWith('C1:')) {
-        final dados = linha.split(',');
-        for (var dado in dados) {
-          final partes = dado.split(':');
-          if (partes.length == 2 && partes[0] == 'C1') {
-            if (mounted) {
-              setState(() {
-                _contador1 = int.tryParse(partes[1]) ?? 0;
-              });
-              _salvarContador1(_contador1);
-              if (_contador1 != _ultimoValorFirebase) {
-                _sincronizarComFirebase(_contador1);
-              }
-            }
-          }
-        }
-      } else {
-        _atualizarStatus(linha);
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
-    bool isConnected = _socket != null;
+    bool isConnected = _esp32Service.isConnected;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tela de Produção'),
+        title: const Text('Conexão ESP32'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -310,7 +238,7 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Contador 1', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  const Text('Conexão ESP32', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   Text(_contador1.toString(), style: const TextStyle(fontSize: 48)),
                   const SizedBox(height: 16),
@@ -319,11 +247,7 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                     children: [
                       ElevatedButton.icon(
                         onPressed: () {
-                          setState(() {
-                            _contador1++;
-                          });
-                          _salvarContador1(_contador1);
-                          _sincronizarComFirebase(_contador1);
+                          _esp32Service.incrementarContador();
                         },
                         icon: const Icon(Icons.add),
                         label: const Text('+1'),
@@ -337,13 +261,9 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                       ElevatedButton(
                         onPressed: () {
                           setState(() {
-                            _contador1 = 0;
                             _resetEmAndamento = true;
                           });
-                          if (isConnected) {
-                            _enviarComando('r1');
-                          }
-                          _salvarContador1(0);
+                          _esp32Service.resetarContador();
                           Future.delayed(const Duration(milliseconds: 600), () async {
                             await _sincronizarComFirebase(0);
                             if (mounted) {
@@ -367,7 +287,12 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    onPressed: _tryConnect,
+                    onPressed: () {
+                      _esp32Service.forcarAtualizacao();
+                      if (!isConnected) {
+                        _esp32Service.forceReconnect();
+                      }
+                    },
                     icon: const Icon(Icons.refresh),
                     label: const Text('Atualizar'),
                   ),
@@ -471,4 +396,3 @@ class _TelaDeProducaoState extends State<TelaDeProducao> {
     );
   }
 }
-

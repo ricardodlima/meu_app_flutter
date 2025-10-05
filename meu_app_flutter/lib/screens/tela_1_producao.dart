@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/esp32_connection_service.dart';
 
 // Enum para representar o status da produção de forma clara e segura.
 // Usar um enum é melhor do que usar Strings ("PRODUZINDO", "PARADA")
@@ -31,13 +32,10 @@ class Tela1Producao extends StatefulWidget {
   State<Tela1Producao> createState() => _Tela1ProducaoState();
 }
 
-class _Tela1ProducaoState extends State<Tela1Producao> {
+class _Tela1ProducaoState extends State<Tela1Producao> with WidgetsBindingObserver {
   int _contador1 = 0;
   String _statusConexao = 'Desconectado';
   bool _emProcessoDeConexao = false;
-  Socket? _socket;
-  Timer? _pollingTimer;
-  Timer? _reconnectTimer;
   late TextEditingController _ipController;
   late TextEditingController _portController;
   late TextEditingController _operadorController;
@@ -45,6 +43,9 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   late TextEditingController _numeroProgramaController;
   String _motivoSelecionado = '1';
   String _motivoParadaSelecionado = '1';
+
+  // Serviço compartilhado ESP32
+  final Esp32ConnectionService _esp32Service = Esp32ConnectionService();
 
   // NOVA VARIÁVEL DE ESTADO para controlar o status da máquina.
   // Ela começa com o valor 'produzindo'.
@@ -89,7 +90,8 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   @override
   void initState() {
     super.initState();
-    _ipController = TextEditingController(text: '192.18.1.100');
+    WidgetsBinding.instance.addObserver(this);
+    _ipController = TextEditingController(text: '192.168.1.100');
     _portController = TextEditingController(text: '8080');
     _operadorController = TextEditingController(text: '00000');
     _modeloPecaController = TextEditingController();
@@ -97,6 +99,12 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     _operadorController.addListener(() {
       setState(() {});
     });
+    
+    // Configurar listeners do serviço ESP32
+    _esp32Service.addStatusListener(_onStatusChanged);
+    _esp32Service.addContadorListener(_onContadorChanged);
+    _esp32Service.addConnectionListener(_onConnectionChanged);
+    
     _carregarDadosIniciais();
   }
 
@@ -108,18 +116,66 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Verificar conexão e forçar se necessário
+      if (!_esp32Service.isConnected) {
+        print("App voltou ao foco - forçando reconexão ESP32");
+        _esp32Service.forceReconnect();
+      } else {
+        // Força atualização quando o app volta ao foco
+        _esp32Service.forcarAtualizacao();
+      }
+    }
+  }
+
+  @override
   void dispose() {
-    _pollingTimer?.cancel();
-    _reconnectTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _timerCiclo?.cancel();
     _timerPiscar?.cancel();
-    _socket?.destroy();
+    
+    // Remover listeners do serviço ESP32
+    _esp32Service.removeStatusListener(_onStatusChanged);
+    _esp32Service.removeContadorListener(_onContadorChanged);
+    _esp32Service.removeConnectionListener(_onConnectionChanged);
+    
     _ipController.dispose();
     _portController.dispose();
     _operadorController.dispose();
     _modeloPecaController.dispose();
     _numeroProgramaController.dispose();
     super.dispose();
+  }
+
+  // Callbacks do serviço ESP32
+  void _onStatusChanged(String status) {
+    if (mounted) {
+      // Não atualizar status se estiver "Conectando..." para evitar mostrar na tela
+      if (!status.contains('Conectando')) {
+        setState(() {
+          _statusConexao = status;
+        });
+      }
+    }
+  }
+
+  void _onContadorChanged(int contador) {
+    if (mounted) {
+      setState(() {
+        _contador1 = contador;
+      });
+      _salvarContador1(contador);
+      _zerarTimerCiclo();
+    }
+  }
+
+  void _onConnectionChanged(bool connected) {
+    if (mounted) {
+      setState(() {
+        _emProcessoDeConexao = !connected && _esp32Service.emProcessoDeConexao;
+      });
+    }
   }
 
   Future<void> _carregarDadosIniciais() async {
@@ -129,7 +185,17 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     await _carregarNumeroProgramaSalvo();
     await _carregarTempoLimiteDinamico();
     _verificarControleDeRede();
-    _startAutoConnect();
+    
+    // Configurar e iniciar serviço ESP32 imediatamente
+    _esp32Service.setConfig(_ipController.text, _portController.text);
+    _esp32Service.startAutoConnect();
+    
+    // Forçar conexão inicial após um pequeno delay
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (!_esp32Service.isConnected) {
+        _esp32Service.forceReconnect();
+      }
+    });
   }
 
   Future<void> _carregarContadorSalvo() async {
@@ -212,15 +278,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
   }
 
   void _subtrairContagem() {
-    if (_contador1 > 0) {
-      setState(() {
-        _contador1--;
-      });
-      _salvarContador1(_contador1);
-      if (_socket != null) {
-        _enviarComando('r1');
-      }
-    }
+    _esp32Service.decrementarContador();
   }
 
   Future<void> _verificarControleDeRede() async {
@@ -249,124 +307,6 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     }
   }
 
-  void _startAutoConnect() {
-    _tryConnect();
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_socket == null && !_emProcessoDeConexao) {
-        _tryConnect();
-      }
-    });
-  }
-
-  void _tryConnect() {
-    if (!_emProcessoDeConexao && _socket == null) {
-      _iniciarConexao();
-    }
-  }
-
-  void _atualizarStatus(String status) {
-    if (mounted) {
-      setState(() {
-        _statusConexao = status;
-      });
-    }
-  }
-
-  Future<void> _iniciarConexao() async {
-    if (_emProcessoDeConexao || _socket != null) return;
-    setState(() {
-      _emProcessoDeConexao = true;
-      _atualizarStatus('Conectando...');
-    });
-    try {
-      if (_networkControlSupported && _ethernetAvailable) {
-        await _forcarRedeEthernet();
-      }
-      final ip = _ipController.text;
-      final port = int.tryParse(_portController.text) ?? 8080;
-      _socket =
-          await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
-      _atualizarStatus('Conectado');
-      _socket!.listen(
-        (List<int> dados) {
-          final resposta = utf8.decode(dados).trim();
-          _processarResposta(resposta);
-        },
-        onError: (error) {
-          _handleDesconexao(erro: error.toString());
-        },
-        onDone: () {
-          _handleDesconexao();
-        },
-      );
-      _pollingTimer?.cancel();
-      _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-        if (_socket != null) {
-          _enviarComando('getcounts');
-        } else {
-          timer.cancel();
-        }
-      });
-    } catch (e) {
-      _handleDesconexao(erro: e.toString());
-    } finally {
-      if (mounted) {
-        setState(() {
-          _emProcessoDeConexao = false;
-        });
-      }
-    }
-  }
-
-  void _handleDesconexao({String? erro}) {
-    _socket?.destroy();
-    _socket = null;
-    _pollingTimer?.cancel();
-    if (mounted) {
-      setState(() {
-        _emProcessoDeConexao = false;
-      });
-      _atualizarStatus(erro ?? 'Desconectado');
-    }
-  }
-
-  void _enviarComando(String comando) {
-    if (_socket != null) {
-      try {
-        _socket!.writeln(comando);
-      } catch (e) {
-        print('Erro ao enviar comando: $e');
-      }
-    }
-  }
-
-  void _processarResposta(String resposta) {
-    if (!mounted) return;
-    resposta
-        .split('\n')
-        .where((linha) => linha.trim().isNotEmpty)
-        .forEach((linha) {
-      if (linha.startsWith('C1:')) {
-        final dados = linha.split(',');
-        for (var dado in dados) {
-          final partes = dado.split(':');
-          if (partes.length == 2 && partes[0] == 'C1') {
-            if (mounted) {
-              setState(() {
-                _contador1 = int.tryParse(partes[1]) ?? 0;
-              });
-              _salvarContador1(_contador1);
-              // ZERAR TIMER DE CICLO quando recebe pulso ESP32
-              _zerarTimerCiclo();
-            }
-          }
-        }
-      } else {
-        _atualizarStatus(linha);
-      }
-    });
-  }
 
   // Métodos para controle do timer de ciclo
   void _iniciarTimerCiclo() {
@@ -494,6 +434,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
     );
   }
 
+
   // Widget para barra de alerta piscante
   Widget _buildBarraAlerta() {
     return Container(
@@ -567,13 +508,7 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          setState(() {
-                            _contador1 = 0;
-                          });
-                          _salvarContador1(0);
-                          if (_socket != null) {
-                            _enviarComando('r1');
-                          }
+                          _esp32Service.resetarContador();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
@@ -803,15 +738,9 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                     width: 250,
                     child: ElevatedButton(
                       onPressed: () {
-                        setState(() {
-                          _contador1++;
-                        });
-                        _salvarContador1(_contador1);
+                        _esp32Service.incrementarContador();
                         // Zera o timer de ciclo porque uma peça foi produzida manualmente
                         _zerarTimerCiclo();
-                        if (_socket != null) {
-                          _enviarComando('+1');
-                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -825,6 +754,30 @@ class _Tela1ProducaoState extends State<Tela1Producao> {
                               fontSize: 20,
                               fontFamily: 'Roboto',
                               fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: 250,
+                    child: ElevatedButton.icon(
+                      onPressed: _esp32Service.isConnected ? () {
+                        _esp32Service.forcarAtualizacao();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Atualizando contador do ESP32...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      } : null,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Atualizar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _esp32Service.isConnected ? Colors.blue : Colors.grey,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5)),
+                      ),
                     ),
                   ),
                 ],

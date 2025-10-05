@@ -4,7 +4,7 @@ import 'firebase_options.dart';
 import 'screens/tela_1_producao.dart';
 import 'screens/tela_2_producao.dart';
 import 'screens/tela_3_hora_turno.dart';
-import 'screens/tela_de_producao.dart';
+import 'screens/conexao_esp32.dart';
 import 'screens/configuracoes_screen.dart';
 import 'screens/config_ethernet_screen.dart';
 import 'screens/ajuste_producao.dart';
@@ -62,7 +62,7 @@ class MyApp extends StatelessWidget {
         '/tela1': (context) => const Tela1Producao(),
         '/tela2': (context) => const Tela2Producao(),
         '/tela3': (context) => const Tela03HoraTurno(),
-        '/producao': (context) => const TelaDeProducao(),
+        '/producao': (context) => const ConexaoEsp32(), // Conexão ESP32
         '/configuracoes': (context) => const ConfiguracoesScreen(),
         '/conf-ethernet': (context) => const ConfigEthernetScreen(),
         '/ajuste_producao': (context) => const AjusteProducao(),
